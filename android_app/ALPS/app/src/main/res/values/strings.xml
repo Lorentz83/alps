@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">ALPS</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="bt_paired_address">bt_paired_address</string>
+
+    <string name="action_connect_bt">Connect bluetooth</string>
+    <string name="action_find_device">Pair new device</string>
+    <string name="action_load_image">Open image</string>
+</resources>
