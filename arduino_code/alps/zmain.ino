@@ -3,7 +3,8 @@
 // Which pin on the Arduino is connected to the NeoPixels?
 #define PIN        6
 
-#define NUMPIXELS 30
+
+#define NUMPIXELS 150
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
 #define BUTTON 12

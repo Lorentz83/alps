@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TableLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+
+    android:padding="5dp">
+
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="fill_parent"
+            android:gravity="center|end"
+            android:text="@string/red" />
+
+        <SeekBar
+            android:id="@+id/seek_bar_red"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_weight="2"
+            android:max="255"
+            android:progress="0" />
+    </TableRow>
+
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="fill_parent"
+            android:gravity="center|end"
+            android:labelFor="@+id/seek_bar_green"
+            android:text="@string/green" />
+
+        <SeekBar
+            android:id="@+id/seek_bar_green"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_weight="2"
+            android:max="255"
+            android:progress="0" />
+    </TableRow>
+
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="fill_parent"
+            android:gravity="center|end"
+            android:labelFor="@+id/seek_bar_blue"
+            android:text="@string/blue" />
+
+        <SeekBar
+            android:id="@+id/seek_bar_blue"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_weight="2"
+            android:max="255"
+            android:progress="0" />
+    </TableRow>
+
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="fill_parent"
+            android:gravity="center|end"
+            android:labelFor="@+id/html_code_text"
+            android:text="@string/html_code" />
+
+        <EditText
+            android:id="@+id/html_code_text"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:inputType="text"
+            android:importantForAutofill="no" />
+
+        <View
+            android:id="@+id/color_preview"
+            android:layout_width="40dp"
+            android:layout_height="fill_parent" />
+
+    </TableRow>
+</TableLayout>
