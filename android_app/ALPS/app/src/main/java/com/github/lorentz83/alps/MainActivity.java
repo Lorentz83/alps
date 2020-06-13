@@ -9,8 +9,8 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.graphics.drawable.AnimationDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -25,8 +25,10 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuCompat;
 import androidx.viewpager.widget.ViewPager;
 
+import com.github.lorentz83.alps.communication.Protocol;
 import com.github.lorentz83.alps.ui.ColorPicker;
 import com.github.lorentz83.alps.ui.MyPagerAdapter;
+import com.github.lorentz83.alps.ui.ReshowSettingsDialog;
 import com.github.lorentz83.alps.utils.BluetoothHelper;
 import com.github.lorentz83.alps.utils.CustomTextResult;
 import com.github.lorentz83.alps.utils.LogUtility;
@@ -53,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private Preferences _sharedPref;
     private MyPagerAdapter _myPagerAdapter;
     private MenuItem _actionBt;
+    private ReshowSettingsDialog _reshowSettingsDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +89,23 @@ public class MainActivity extends AppCompatActivity {
         }
 
         _colorPicker = new ColorPicker(this);
+        _reshowSettingsDialog = new ReshowSettingsDialog(this, (pref)->{
+            BluetoothSocket dev = _sharedPref.getConnectedBluetooth();
+            if (dev == null) {
+                showToast("Bluetooth is disconnected");
+                return false;
+            }
+            Protocol p = new Protocol();
+            try {
+                p.initializeConnection(dev);
+                p.replaySettings(pref.delay, pref.brightness, pref.loop);
+                return true;
+            } catch (IOException e) {
+                log.w("protocol error", e);
+                showToast("Error: "+e.getMessage());
+                return false;
+            }
+        });
     }
 
     @Override
@@ -115,6 +135,9 @@ public class MainActivity extends AppCompatActivity {
             case R.id.action_fill_color:
                 colorPicker();
                 return true;
+            case R.id.action_reshow_settings:
+                _reshowSettingsDialog.show();
+                return true;
             default:
                 log.i("OptionItemSelected, unknown menu entry %s", id);
         }
@@ -135,7 +158,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void writeText(String text, int backgroundColor, int textColor) {
+    private void writeText(String text, int backgroundColor, int textColor, Typeface face) {
         // https://stackoverflow.com/questions/8799290/convert-string-text-to-bitmap
         float textSize = 300;
 
@@ -143,6 +166,7 @@ public class MainActivity extends AppCompatActivity {
         paint.setTextSize(textSize);
         paint.setColor(textColor);
         paint.setTextAlign(Paint.Align.LEFT);
+        paint.setTypeface(face);
 
         float baseline = -paint.ascent(); // ascent() is negative
         int width = (int) paint.measureText(text);
@@ -169,13 +193,12 @@ public class MainActivity extends AppCompatActivity {
         if (_socket != null) {
             disconnectBluetooth();
             return;
-        }
-        if (_socket == null) {
+        } else {
             connectBluetooth();
         }
     }
 
-    private void disconnectBluetooth() {
+    public void disconnectBluetooth() {
         if (_socket != null) {
             try {
                 _socket.close();
@@ -240,9 +263,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 showToast(String.format("error connecting to bluetooth: %s", e.getMessage()));
                 log.w("cannot connect to bluetooth", e);
-                runOnUiThread(() -> {
-                    _actionBt.setIcon(R.drawable.ic_bt_disconnected);
-                });
+                runOnUiThread(() -> _actionBt.setIcon(R.drawable.ic_bt_disconnected));
             }
         });
     }
@@ -259,10 +280,15 @@ public class MainActivity extends AppCompatActivity {
                     // User has chosen to pair with the Bluetooth device.
                     BluetoothDevice deviceToPair =
                             data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE);
-                    deviceToPair.createBond();
+                    boolean newBond = deviceToPair.createBond();
                     _sharedPref.setBluetoothAddress(deviceToPair.getAddress());
 
-                    connectBluetooth(deviceToPair);
+                    log.i("createBond = %s", newBond);
+                    if ( !newBond ) {
+                        connectBluetooth(deviceToPair);
+                    }
+                    // TODO register to ACTION_BOND_STATE_CHANGED to know when the pin is set and
+                    // start the connection.
                 } else {
                     showToast("No bluetooth device found");
                 }
@@ -291,7 +317,8 @@ public class MainActivity extends AppCompatActivity {
             case REQUEST_CUSTOM_TEXT: {
                 if (resultCode == Activity.RESULT_OK) {
                     CustomTextResult res = (CustomTextResult) data.getSerializableExtra(CustomTextResult.CUSTOM_TEXT_RESULT);
-                    writeText(res.getText(), res.getBackgroundColor(), res.getForegroundColor());
+                    Typeface face = Typeface.DEFAULT;
+                    writeText(res.getText(), res.getBackgroundColor(), res.getForegroundColor(), face);
                 } else {
                     showToast("No text provided");
                 }

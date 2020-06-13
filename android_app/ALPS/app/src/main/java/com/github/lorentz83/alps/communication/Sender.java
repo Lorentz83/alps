@@ -1,11 +1,11 @@
 package com.github.lorentz83.alps.communication;
 
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 
 import com.github.lorentz83.alps.utils.LogUtility;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 /**
  * Sender implements an abstraction around Protocol to send images to the stick.
@@ -40,6 +40,15 @@ public class Sender {
      */
     public void sendBitmap(Bitmap bitmap) {
         _sender.sendBitmap(bitmap);
+    }
+
+    /**
+     * Uploads (without showing) the specified bitmap to the stick.
+     *
+     * @param bitmap the image to send.
+     */
+    public void uploadBitmap(Bitmap bitmap) {
+        _sender.uploadBitmap(bitmap);
     }
 
     /**
@@ -108,6 +117,7 @@ class internalSender extends Thread {
     private int _delay = 0;
     private boolean _loop = false;
     private float _brightness;
+    private boolean _upload;
 
     public internalSender(Protocol p, SenderCallbacks callbacks) {
         _p = p;
@@ -126,54 +136,92 @@ class internalSender extends Thread {
                 int delay = 0;
                 boolean loop = false;
                 float brightness = 100;
+                boolean upload = false;
                 synchronized (this) {
                     delay = _delay;
                     loop = _loop;
                     brightness = _brightness;
+                    upload = _upload;
                 }
 
                 _callbacks.start();
 
-                sendBitmap(_p, _callbacks, bmp, delay, loop, brightness);
-                _p.off(); // Turn the stick off once we are done.
+                if (upload) {
+                    log.i("uploading bitmap");
+                    uploadBitmap(_p, _callbacks, bmp);
+                } else {
+                    log.i("sending bitmap");
+                    sendBitmap(_p, _callbacks, bmp, delay, loop, brightness);
+                }
 
                 _callbacks.done();
             }
         } catch (InterruptedException e) {
             log.i("Sender interrupted: %s", e.getMessage());
+            // no callback.onError here, this happens every time the user stops the sending.
             try {
                 _p.off();
             } catch (IOException ex) {
                 log.w("Protocol error while turning off stick", e);
             }
         } catch (IOException e) {
+            _callbacks.onError(e);
             log.w("Protocol error", e);
         } finally {
             _callbacks.done();
         }
     }
 
-    // To avoid syncronization problems, this function is static and cannot access any field.
+    // To avoid synchronization problems, this function is static and cannot access any field.
     private static void sendBitmap(Protocol _p, SenderCallbacks _callbacks, Bitmap bmp, int delay, boolean loop, float brightness) throws IOException, InterruptedException {
         int w = bmp.getWidth();
         int h = bmp.getHeight();
 
-        ArrayList<PixelColor> col = new ArrayList<>();
+        // flip vertically because our origin is on the bottom of the stick.
+        Matrix matrix = new Matrix();
+        matrix.postScale(1, -1, w/2f, h/2f);
+        bmp = Bitmap.createBitmap(bmp, 0, 0, w, h, matrix, true);
+        
+        int [][]cols = new int[w][h];
+        for (int x = 0; x < w; x++) {
+            bmp.getPixels(cols[x], 0, 1, x, 0, 1, h);
+        }
+
         do {
-            for (int x = 0; x < w; x++) {
-                col.clear();
-                for (int y = h - 1; y >= 0; y--) {
-                    PixelColor color = new PixelColor(bmp.getPixel(x, y), brightness);
-                    col.add(color);
-                }
-                _p.writePixels(0, col.iterator());
-                _p.show();
+            int x = 0;
+
+            long prev = System.currentTimeMillis();
+            for (int []col: cols) {
+                _p.writeColumn(col, brightness);
                 sleep(delay); // isInterrupted is checked already here.
 
                 // TODO: send the progress less frequently to save (very little) resources.
                 _callbacks.progress(Math.round((float) (x + 1) / w * 100));
+                x++;
+
+                long now = System.currentTimeMillis();
+                log.i("Time to preprocess: %dms", now - prev);
+                prev= now;
             }
         } while (loop);
+        _p.off(); // Turn the stick off once we are done.
+    }
+
+    // To avoid synchronization problems, this function is static and cannot access any field.
+    private static void uploadBitmap(Protocol _p, SenderCallbacks _callbacks, Bitmap bmp) throws IOException, InterruptedException {
+        int w = bmp.getWidth();
+        int h = bmp.getHeight();
+
+        // getPixels returns row by row from the top.
+        // rotating 90 we get the columns.
+        Matrix matrix = new Matrix();
+        matrix.postRotate(90);
+        bmp = Bitmap.createBitmap(bmp, 0, 0, w, h, matrix, true);
+
+        int []pixels = new int[w*h];
+        bmp.getPixels(pixels, 0, h, 0, 0, h, w); // h and w are flipped because we rotated 90 deg.
+
+        _p.uploadImage(w, h, pixels, (int col) -> _callbacks.progress(Math.round((float) col / w * 100)));
     }
 
     /**
@@ -198,6 +246,18 @@ class internalSender extends Thread {
      */
     public synchronized void sendBitmap(Bitmap bitmap) {
         this._bitmap = bitmap;
+        this._upload = false;
+        notifyAll();
+    }
+
+    /**
+     * Uploads a new bitmap.
+     *
+     * @param bitmap the image to send.
+     */
+    public synchronized void uploadBitmap(Bitmap bitmap) {
+        this._bitmap = bitmap;
+        this._upload = true;
         notifyAll();
     }
 

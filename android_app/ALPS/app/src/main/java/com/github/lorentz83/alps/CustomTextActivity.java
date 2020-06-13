@@ -16,8 +16,7 @@ import androidx.core.view.MenuCompat;
 import com.github.lorentz83.alps.ui.ColorPicker;
 import com.github.lorentz83.alps.utils.CustomTextResult;
 import com.github.lorentz83.alps.utils.LogUtility;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
+
 
 // TODO add a font picker
 // http://www.ulduzsoft.com/2012/01/enumerating-the-fonts-on-android-platform/
@@ -40,7 +39,7 @@ public class CustomTextActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);   //show back button
 
-        _userText= findViewById(R.id.user_text);
+        _userText = findViewById(R.id.user_text);
         _colorPicker = new ColorPicker(this);
 
         Button foregroundBtn = findViewById(R.id.btn_foreground);
@@ -67,7 +66,7 @@ public class CustomTextActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onSupportNavigateUp(){
+    public boolean onSupportNavigateUp() {
         finish();
         return true;
     }
@@ -103,3 +102,4 @@ public class CustomTextActivity extends AppCompatActivity {
         _userText.setTextColor(_fgColor);
     }
 }
+

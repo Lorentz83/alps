@@ -64,6 +64,10 @@ public class LogUtility {
         return Log.e(_tag, msg, tr);
     }
 
+    public int e(String format, Object... args) {
+        return e(String.format(format, args));
+    }
+
     public int wtf(String msg) {
         return Log.wtf(_tag, msg);
     }

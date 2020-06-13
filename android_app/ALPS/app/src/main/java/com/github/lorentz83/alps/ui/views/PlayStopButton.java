@@ -66,5 +66,13 @@ public class PlayStopButton {
         _isRunning = false;
         updatePlayStopButton();
     }
+
+    /**
+     * Enables or disables the button.
+     * @param enable
+     */
+    public void setEnabled(boolean enable) {
+        _btn.setEnabled(enable);
+    }
 }
 

@@ -8,24 +8,15 @@ import java.util.Objects;
  * Defines the color of a single pixel.
  */
 public class PixelColor {
-    /**
-     * The red component of the color.
-     * <p>
-     * Valid values are between 0 and 255.
-     */
-    public final byte R;
-    /**
-     * The green component of the color.
-     * <p>
-     * Valid values are between 0 and 255.
-     */
-    public final byte G;
-    /**
-     * The blue component of the color.
-     * <p>
-     * Valid values are between 0 and 255.
-     */
-    public final byte B;
+    private byte red;
+    private byte green;
+    private byte blue;
+
+    public PixelColor() {
+        red = 0;
+        green = 0;
+        blue = 0;
+    }
 
     /**
      * Initializes the color from the given argb non pre-multiplied encoding and the brightness.
@@ -34,6 +25,16 @@ public class PixelColor {
      * @param brightness between 0 and 1.
      */
     public PixelColor(int argb, float brightness) {
+        setColor(argb, brightness);
+    }
+
+    /**
+     * Sets the color from the given argb non pre-multiplied encoding and the brightness.
+     *
+     * @param argb       the argb non pre-multiplied encoded color of the pixel.
+     * @param brightness between 0 and 1.
+     */
+    public void setColor(int argb, float brightness) {
         if (brightness < 0 || brightness > 1) {
             throw new IllegalArgumentException("brightness value must in [0, 1]");
         }
@@ -43,14 +44,24 @@ public class PixelColor {
         int g = Color.green(argb);
         int b = Color.blue(argb);
 
-        R = (byte) Math.round((brightness * alpha) / 255.0 * r);
-        G = (byte) Math.round((brightness * alpha) / 255.0 * g);
-        B = (byte) Math.round((brightness * alpha) / 255.0 * b);
+        red = (byte) Math.round((brightness * alpha) / 255.0 * r);
+        green = (byte) Math.round((brightness * alpha) / 255.0 * g);
+        blue = (byte) Math.round((brightness * alpha) / 255.0 * b);
+    }
+    /**
+     * Sets the color from the given argb non pre-multiplied encoding.
+     *
+     * Same as setColor(argb, 1)
+     *
+     * @param argb       the argb non pre-multiplied encoded color of the pixel.
+     */
+    public void setColor(int argb) {
+        setColor(argb, 1);
     }
 
     @Override
     public String toString() {
-        return String.format("PixelColor(%d, %d, %d)", R, G, B);
+        return String.format("PixelColor(%d, %d, %d)", red, green, blue);
     }
 
     @Override
@@ -58,13 +69,40 @@ public class PixelColor {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         PixelColor that = (PixelColor) o;
-        return R == that.R &&
-                G == that.G &&
-                B == that.B;
+        return red == that.red &&
+                green == that.green &&
+                blue == that.blue;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(R, G, B);
+        return Objects.hash(red, green, blue);
+    }
+
+    /**
+     * The red component of the color.
+     * <p>
+     * Valid values are between 0 and 255.
+     */
+    public byte getRed() {
+        return red;
+    }
+
+    /**
+     * The green component of the color.
+     * <p>
+     * Valid values are between 0 and 255.
+     */
+    public byte getGreen() {
+        return green;
+    }
+
+    /**
+     * The blue component of the color.
+     * <p>
+     * Valid values are between 0 and 255.
+     */
+    public byte getBlue() {
+        return blue;
     }
 }

@@ -27,4 +27,10 @@ public interface SenderCallbacks {
      * Called when the image is started sending.
      */
     void start();
+
+    /**
+     * Called when an error happen.
+     * @param e the thrown exception.
+     */
+    void onError(Exception e);
 }

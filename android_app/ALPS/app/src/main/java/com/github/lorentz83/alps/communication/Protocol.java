@@ -10,7 +10,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Iterator;
+import java.util.function.IntConsumer;
 
 /**
  * Defines the communication protocol with the stick.
@@ -22,12 +22,13 @@ public class Protocol {
     private OutputStream _out;
 
     private final byte OFF = 'o';
-    private final byte SHOW = 's';
-    private final byte PIXEL = 'p';
     private final byte READY = 'r';
+    private final byte COLUMN = 'c';
+    private final byte UPLOAD = 'u';
+    private final byte RESHOW = 'w';
+    private final byte SETTINGS = 's';
 
-    private static final int BUFFER_SIZE = 64;
-    private final byte[] _buf = new byte[BUFFER_SIZE];
+    private final byte[] _buf = new byte[255*3+2];
 
     /**
      * Initializes the protocol.
@@ -64,7 +65,7 @@ public class Protocol {
      * @throws IOException  in case of IO error
      * @throws EOFException if the stream closes.
      */
-    final void readFully(byte buf[], int len) throws IOException {
+    final void readFully(byte[] buf, int len) throws IOException {
         // TODO we should add a timeout here.
         if (len < 0)
             throw new IndexOutOfBoundsException();
@@ -91,61 +92,91 @@ public class Protocol {
     }
 
     private void sendAndWaitForAck(byte[] buf, int len) throws IOException {
-        for (int i = 1; ; i++) {
-            try {
-                sendOnly(buf, len);
-                waitAck();
-                return;
-            } catch (ProtocolException ex) {
-                if (i <= 3) {
-                    log.w("retry %d on %v", i, ex.getMessage());
-                } else {
-                    throw ex;
-                }
-            }
-        }
+        sendOnly(buf, len);
+        waitAck();
     }
 
     /**
-     * Sends the pixels to the stick.
-     * <p>
-     * To show them, call show().
+     * Sends the while column to the stick and shows it.
      *
-     * @param pos    the position of the 1st pixel to set.
+     * It is 10% faster than writePixels on big images.
+     *
      * @param pixels the color of the pixels.
      * @throws IOException in case of error.
      */
-    public void writePixels(int pos, Iterator<PixelColor> pixels) throws IOException {
-        _buf[0] = PIXEL;
-        // _buf[1] = len // will be filled later.
-        _buf[2] = (byte) pos;
+    public void writeColumn(int[] pixels, float brightness) throws IOException {
+        int len = (pixels.length * 3) + 2;
+        _buf[0] = COLUMN;
 
-        int i = 3;
-        int num = 0;
-        for (int avail = BUFFER_SIZE - 3; avail > 3 && pixels.hasNext(); avail -= 3) {
-            PixelColor c = pixels.next();
-            _buf[i++] = c.R;
-            _buf[i++] = c.G;
-            _buf[i++] = c.B;
-            num++;
+        if (pixels.length> 255) {
+            throw new ProtocolException("cannot send more than 255 pixels with writeColumn");
         }
-        _buf[1] = (byte) i;
 
-        sendOnly(_buf, i);
-        if (pixels.hasNext()) {
-            writePixels(pos + num, pixels);
+        _buf[1] = (byte) pixels.length;
+
+        int i = 2;
+        PixelColor c = new PixelColor();
+        for (int rawColor : pixels) {
+            c.setColor(rawColor, brightness);
+            _buf[i++] = c.getRed();
+            _buf[i++] = c.getGreen();
+            _buf[i++] = c.getBlue();
         }
+
+        sendAndWaitForAck(_buf, len);
     }
 
     /**
-     * Sends the command to show the pixels, as set by writePixels().
+     * Uploads an image to the internal stick memory.
      *
+     * @param w the width of the image.
+     * @param h the height of the image.
+     * @param pixels the color of the pixels, ordered in columns.
+     * @param callback if non null, this predicate is called with the number of the last column sent.
      * @throws IOException in case of error.
      */
-    public void show() throws IOException {
-        _buf[0] = SHOW;
-        _buf[1] = 2;
-        sendAndWaitForAck(_buf, 2);
+    public void uploadImage(int w, int h, int[] pixels, IntConsumer callback) throws IOException, InterruptedException {
+        if ( h > 255 ) {
+            throw new ProtocolException("uploaded images cannot be higher than 255 pixels");
+        }
+        if ( w > 0xffff ) { // 255 *255
+            throw new ProtocolException("uploaded images cannot be wider than 65025 pixels");
+        }
+        if (pixels.length != w*h) {
+            throw new IllegalArgumentException("number of pixels doesn't match the image size");
+        }
+
+        byte wHi = (byte)((w >>> 8) & 0xff);
+        byte wLow =  (byte)(w & 0xff);
+
+        _buf[0] = UPLOAD;
+        _buf[1] = (byte) h;
+        _buf[2] = wHi;
+        _buf[3] = wLow;
+        sendAndWaitForAck(_buf, 4);
+
+        log.i("uploading image %d x %d. w = (%x, %x)", w, h, wHi, wLow);
+
+
+        int i = 0;
+        int col = 0;
+        PixelColor c = new PixelColor();
+        for (int rawColor : pixels) {
+            c.setColor(rawColor);
+            _buf[i++] = c.getRed();
+            _buf[i++] = c.getGreen();
+            _buf[i++] = c.getBlue();
+
+            if ( (i / 3) % h == 0 ) {
+                col++;
+                sendAndWaitForAck(_buf, i);
+                i = 0;
+                if (callback != null) {
+                    callback.accept(col);
+                }
+            }
+        }
+        log.i("upload completed");
     }
 
     /**
@@ -182,6 +213,29 @@ public class Protocol {
         _buf[1] = 2;
         sendAndWaitForAck(_buf, 2);
     }
+
+    /**
+     * Sets the runtime settings for uploaded images.
+     *
+     * @param delayMs the delay between columns.
+     * @param brightness the brightness (0 to 255).
+     * @param loop if the image should go in loop.
+     *
+     * @throws IOException
+     */
+    public void replaySettings(int delayMs, int brightness, boolean loop) throws IOException {
+        // TODO it would be nice to handle the brightness in the same way at this level.
+
+        // TODO better error checking on boundaries.
+        _buf[0] = SETTINGS;
+        _buf[1] = (byte) (delayMs/10);
+        _buf[2] = (byte) brightness;
+        _buf[3] = (byte) (loop ? 1: 0);
+
+        sendAndWaitForAck(_buf, 4);
+    }
+
+
 }
 
 class NoInputStream extends InputStream {

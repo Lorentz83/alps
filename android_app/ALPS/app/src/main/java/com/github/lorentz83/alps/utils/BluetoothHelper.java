@@ -33,7 +33,7 @@ public class BluetoothHelper {
     private final static LogUtility log = new LogUtility(BluetoothHelper.class);
 
     private static final UUID RFCOMM_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-    private static final Pattern _bluetoothNamePattern = Pattern.compile("(d|bl)uino");
+    private static final Pattern _bluetoothNamePattern = Pattern.compile("^ALPS-.*");
 
     private BluetoothAdapter _bluetoothAdapter;
 
@@ -74,7 +74,8 @@ public class BluetoothHelper {
 
         BluetoothDeviceFilter deviceFilter = new BluetoothDeviceFilter.Builder()
                 .setNamePattern(_bluetoothNamePattern)
-                .addServiceUuid(new ParcelUuid(RFCOMM_UUID), null)
+                // TODO this seems making the selector crashing.
+                // .addServiceUuid(new ParcelUuid(RFCOMM_UUID), null)
                 .build();
 
         AssociationRequest pairingRequest = new AssociationRequest.Builder()

@@ -12,6 +12,7 @@ public class Preferences {
     private static final String LOOP = "loop";
     private static final String WAIT_TIME_MS = "wait_time_ms";
     private static final String STICK_BRIGHTNESS = "stick_brightness";
+    private static final String WIDTH_MULTIPLIER = "width_multiplier";
 
     private final SharedPreferences _sharedPref;
     private static Preferences _instance;
@@ -79,6 +80,16 @@ public class Preferences {
 
     public float getStickBrightness() {
         return _sharedPref.getFloat(STICK_BRIGHTNESS, 1);
+    }
+
+    public void setWidthMultiplier(float val) {
+        SharedPreferences.Editor editor = _sharedPref.edit();
+        editor.putFloat(WIDTH_MULTIPLIER, val);
+        editor.apply();
+    }
+
+    public float getWidthMultiplier() {
+        return _sharedPref.getFloat(WIDTH_MULTIPLIER, 1);
     }
 
     public void setConnectedBluetooth(@Nullable BluetoothSocket dev) {

@@ -42,6 +42,16 @@
         android:padding="5dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
+        <Button
+            android:id="@+id/btn_upload"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableStart="@android:drawable/ic_menu_upload"
+            android:paddingTop="20dp"
+            android:paddingBottom="20dp"
+            android:text="@string/upload" />
+
         <Chronometer
             android:id="@+id/chronometer"
             android:layout_width="0dp"

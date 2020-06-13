@@ -1,64 +1,42 @@
-#include <Adafruit_NeoPixel.h>
 
-// Which pin on the Arduino is connected to the NeoPixels?
-#define PIN        6
+LedControl ledControl(NUMPIXELS, LED_STRIP_PIN);
+Protocol protocol(&ledControl, cmdSerial, dbgSerial);
 
-
-#define NUMPIXELS 150
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
-
-#define BUTTON 12
+// We want to have integers which can contain the image width (>255 pixels).
+static_assert((sizeof(unsigned int) >= 2), "need at least 16 bit ints");
 
 void setup() {
+  
+  // button setup.
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-  Serial.begin(115200);
+  // Serial initialization.
+  
+  if (dbgSerial != NULL) {
+    dbgSerial->begin(115200);
+    dbgSerial->println("debug enabled");
+  }
 
-  Serial3.begin(115200);
-  // https://forum.arduino.cc/index.php?topic=280928.0
-  pinMode(15, INPUT_PULLUP); // only needed for  JY-MCU v1.06?
+  cmdSerial->begin(115200);
+#ifdef BT_PULLUP
+  pinMode(15, INPUT_PULLUP); 
+#endif
 
-  pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+  ledControl.init();
 
-  pixels.fill(pixels.Color(2, 0, 0));
-  pixels.show();
-  delay(100);
-  pixels.fill(pixels.Color(0, 2, 0));
-  pixels.show();
-  delay(100);
-  pixels.fill(pixels.Color(0, 0, 2));
-  pixels.show();
-  delay(100);
-  pixels.fill(pixels.Color(0, 0, 0));
-  pixels.show();
+  if (!SD.begin(SD_CS_PIN)) {
+    ledControl.flashError();
+  } else {
+    ledControl.flashInit();
+  }
 }
 
 
-class LedCallbacks: public Callbacks {
-  public:
-    virtual void show() {
-      pixels.show();
-    }
-    virtual void off() {
-      pixels.fill(pixels.Color(0, 0, 0));
-      pixels.show();
-    }
-    virtual bool isButtonPressed() {
-      return digitalRead(BUTTON) == HIGH;
-    }
-    virtual void setPixelColor(int pos, byte r, byte g, byte b) {
-      pixels.setPixelColor(pos, pixels.Color(r, g, b));
-    }
-} callbacks;
-
-//Protocol protocol(&callbacks, &Serial, &Serial3);
-//Protocol protocol(&callbacks, &Serial, NULL);
-
-//Protocol protocol(&callbacks, &Serial3, &Serial);
-Protocol protocol(&callbacks, &Serial3, NULL);
-
 
 void loop() {
+  if ( ledControl.isButtonPressed() ) {
+    protocol.doReshow();
+  }
   protocol.checkChannel();
 }

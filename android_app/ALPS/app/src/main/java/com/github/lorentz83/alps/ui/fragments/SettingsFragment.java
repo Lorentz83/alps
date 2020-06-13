@@ -84,6 +84,27 @@ public class SettingsFragment extends Fragment {
         });
         brightness.setProgress(Math.round(_sharedPref.getStickBrightness() * 100));
 
+        SeekBar width = root.findViewById(R.id.width);
+        TextView widthLabel = root.findViewById(R.id.width_label);
+        width.setMin(20);
+        width.setMax(100);
+        width.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                widthLabel.setText(String.format("%s: % 3d%%", getString(R.string.width), progress));
+                _sharedPref.setWidthMultiplier((float) (progress / 100.0));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+        width.setProgress(Math.round(_sharedPref.getWidthMultiplier() * 100));
+
         return root;
     }
 }

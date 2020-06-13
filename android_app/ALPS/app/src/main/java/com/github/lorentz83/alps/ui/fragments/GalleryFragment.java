@@ -41,9 +41,7 @@ public class GalleryFragment extends Fragment {
                 try {
                     int val = (int) R.mipmap.class.getField(name).get(null);
                     _res.add(val);
-                } catch (IllegalAccessException e) {
-                    log.wtf("reflection error ", e);
-                } catch (NoSuchFieldException e) {
+                } catch (IllegalAccessException | NoSuchFieldException e) {
                     log.wtf("reflection error ", e);
                 }
             }
