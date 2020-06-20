@@ -46,6 +46,7 @@ import androidx.core.view.MenuCompat;
 import androidx.viewpager.widget.ViewPager;
 
 import com.github.lorentz83.alps.communication.Protocol;
+import com.github.lorentz83.alps.ui.AboutWindow;
 import com.github.lorentz83.alps.ui.ColorPicker;
 import com.github.lorentz83.alps.ui.MyPagerAdapter;
 import com.github.lorentz83.alps.ui.ReshowSettingsDialog;
@@ -157,6 +158,9 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             case R.id.action_reshow_settings:
                 _reshowSettingsDialog.show();
+                return true;
+            case R.id.action_about:
+                AboutWindow.show(this);
                 return true;
             default:
                 log.i("OptionItemSelected, unknown menu entry %s", id);
