@@ -53,6 +53,7 @@ import com.github.lorentz83.alps.ui.views.PlayStopButton;
 import com.github.lorentz83.alps.utils.LogUtility;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Timer;
@@ -60,6 +61,8 @@ import java.util.TimerTask;
 
 public class PreviewFragment extends Fragment {
     private final static LogUtility log = new LogUtility(PreviewFragment.class);
+
+    private final static String LAST_IMAGE_FILENAME = "last_image.png";
 
     private static final int REQUEST_EDIT_IMAGE = 123;
 
@@ -74,6 +77,18 @@ public class PreviewFragment extends Fragment {
     private ImageView _preview;
     Button _uploadBtn;
     PlayStopButton _playStopBtn;
+
+    @Override
+    public void onCreate (Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        restorePreviousImage();
+    }
+
+    @Override
+    public void onPause(){
+        super.onPause();
+        storeCurrentImage();
+    }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -155,7 +170,9 @@ public class PreviewFragment extends Fragment {
             }
         });
 
-        // TODO it would be nice to restore the last image used.
+        if (_fullSizeBitmap != null) {
+            updatePreview();
+        }
 
         return root;
     }
@@ -320,6 +337,25 @@ public class PreviewFragment extends Fragment {
                 setBitmap(bmp);
             }
         }
+    }
+
+    private void storeCurrentImage() {
+        File f = new File(getContext().getExternalCacheDir(), LAST_IMAGE_FILENAME);
+        if ( _fullSizeBitmap == null ) {
+            log.i("no image to store");
+            f.delete();
+            return;
+        }
+        try (FileOutputStream fos = new FileOutputStream(f)) {
+            _fullSizeBitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+        } catch (IOException e) {
+            log.w("cannot store current image", e);
+        }
+    }
+
+    private void restorePreviousImage() {
+        File f = new File(getContext().getExternalCacheDir(), LAST_IMAGE_FILENAME);
+        _fullSizeBitmap = BitmapFactory.decodeFile(f.getPath());
     }
 
     private File getNewTempFile() throws IOException {
