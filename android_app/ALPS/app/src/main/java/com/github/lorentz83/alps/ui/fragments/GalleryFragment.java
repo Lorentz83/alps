@@ -57,7 +57,7 @@ public class GalleryFragment extends Fragment {
 
         for (Field f : R.mipmap.class.getFields()) {
             String name = f.getName();
-            if (f.getType() == int.class && name.startsWith("pre_")) {
+            if (f.getType() == int.class && ( name.startsWith("pre_") || name.startsWith("local_") ) ) {
                 try {
                     int val = (int) R.mipmap.class.getField(name).get(null);
                     _res.add(val);
