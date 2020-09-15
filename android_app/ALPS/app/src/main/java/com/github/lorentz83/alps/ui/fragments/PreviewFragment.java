@@ -53,7 +53,6 @@ import com.github.lorentz83.alps.ui.views.PlayStopButton;
 import com.github.lorentz83.alps.utils.LogUtility;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Timer;
@@ -64,8 +63,6 @@ public class PreviewFragment extends Fragment {
 
     private final static String LAST_IMAGE_FILENAME = "last_image.png";
 
-    private static final int REQUEST_EDIT_IMAGE = 123;
-
     private Preferences _sharedPref;
 
     private Protocol _protocol;
@@ -73,7 +70,6 @@ public class PreviewFragment extends Fragment {
 
     private Bitmap _fullSizeBitmap = null;
     private Bitmap _bitmap = null;
-    private File _editedFile = null;
     private ImageView _preview;
     Button _uploadBtn;
     PlayStopButton _playStopBtn;
@@ -97,8 +93,6 @@ public class PreviewFragment extends Fragment {
         _sharedPref = Preferences.getInstance();
 
         _preview = root.findViewById(R.id.image_preview);
-
-        _preview.setOnLongClickListener(v -> editImage());
 
         _playStopBtn = new PlayStopButton(root.findViewById(R.id.btn_play_stop));
         _playStopBtn.setOnPlayListener(v -> {
@@ -309,36 +303,6 @@ public class PreviewFragment extends Fragment {
         ctx.runOnUiThread(() -> Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show());
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        log.i("result %d, %d, %s", requestCode, resultCode, data);
-        if (resultCode != Activity.RESULT_OK) {
-            log.i("the image wasn't edited");
-            return;
-        }
-        // Some app returns the edited image as new data.
-        if (data != null) {
-            log.i("result uri: %s", data.getData());
-            try {
-                setBitmap(MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), data.getData()));
-            } catch (IOException e) {
-              showToast("Cannot load new image");
-              log.e("cannot load edited image", e);
-            } catch (SecurityException e) {
-                log.e("Storage permission is required", e);
-                showToast("Need storage permission");
-            }
-        } else { // Others overwrite the same
-            log.i("loading temporary file; %s", _editedFile.getAbsolutePath());
-            Bitmap bmp = BitmapFactory.decodeFile(_editedFile.getAbsolutePath());
-            if (bmp == null) {
-                log.e("cannot load the image on file %s", _editedFile.getAbsolutePath());
-            } else {
-                setBitmap(bmp);
-            }
-        }
-    }
-
     private void storeCurrentImage() {
         File f = new File(getContext().getExternalCacheDir(), LAST_IMAGE_FILENAME);
         if ( _fullSizeBitmap == null ) {
@@ -358,56 +322,8 @@ public class PreviewFragment extends Fragment {
         _fullSizeBitmap = BitmapFactory.decodeFile(f.getPath());
     }
 
-    private File getNewTempFile() throws IOException {
-        // Directory defined in provider_paths.xml
-        File cachePath = new File(getContext().getExternalCacheDir(), "shared_images");
-        cachePath.mkdirs();
-        for ( File f: cachePath.listFiles() ) {
-            log.i("deleting old temporary file %s", f.getAbsolutePath());
-            f.delete();
-        }
-        // Some apps (com.google.android.markup) seems to have a very aggressive cache, they don't
-        // realize that the file changed, so we have to generate a new file name to be safe.
-        return File.createTempFile("img_", ".png", cachePath);
-    }
-
-    private boolean editImage() {
-        if (_fullSizeBitmap == null) {
-            log.i("nothing to edit");
-            return false;
-        }
-
-        // https://codestringz.com/share-intent-for-a-bitmap-without-saving-a-file/
-        // https://stackoverflow.com/questions/15699299/android-edit-image-intent
-
-
-        try {
-            _editedFile = getNewTempFile();
-            log.i("writing temporary file on %s", _editedFile.getAbsolutePath());
-            FileOutputStream fos = new FileOutputStream(_editedFile);
-            _fullSizeBitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
-            fos.close();
-        } catch (IOException e) {
-            log.e("cannot write temporary file", e);
-            showToast("ERROR: writing temporary file");
-            return true;
-        }
-
-        Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", _editedFile);
-
-        Intent intent = new Intent(Intent.ACTION_EDIT);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-
-        // com.google.android.markup gets the image from here.
-        intent.setDataAndType(uri, "image/png");
-
-        // Snapseed gets the image from here.
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-
-        log.i("sending uri %s, intent %s", uri, intent);
-
-        startActivityForResult(Intent.createChooser(intent, "Edit in"), REQUEST_EDIT_IMAGE);
-        return true;
+    public Bitmap getBitmap() {
+        return _fullSizeBitmap;
     }
 }
 

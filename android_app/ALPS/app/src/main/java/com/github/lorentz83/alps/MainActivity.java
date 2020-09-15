@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
@@ -42,6 +43,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.FileProvider;
 import androidx.core.view.MenuCompat;
 import androidx.viewpager.widget.ViewPager;
 
@@ -55,6 +57,8 @@ import com.github.lorentz83.alps.utils.CustomTextResult;
 import com.github.lorentz83.alps.utils.LogUtility;
 import com.google.android.material.tabs.TabLayout;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -65,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_OPEN_IMAGE = 40;
     private static final int REQUEST_CUSTOM_TEXT = 41;
+    private static final int REQUEST_EDIT_IMAGE = 42;
+
     private static final int REQUEST_ENABLE_BT = 871;
     private static final int SELECT_DEVICE_REQUEST_CODE = 872;
 
@@ -77,6 +83,8 @@ public class MainActivity extends AppCompatActivity {
     private MyPagerAdapter _myPagerAdapter;
     private MenuItem _actionBt;
     private ReshowSettingsDialog _reshowSettingsDialog;
+
+    private File _editedFile = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -161,6 +169,9 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             case R.id.action_about:
                 AboutWindow.show(this);
+                return true;
+            case R.id.action_edit_image:
+                editImage();
                 return true;
             default:
                 log.i("OptionItemSelected, unknown menu entry %s", id);
@@ -348,8 +359,41 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
             }
+            case REQUEST_EDIT_IMAGE: {
+                readReturnBitmap(requestCode, resultCode, data);
+            }
             default:
                 log.i("onActivityResult unknown code %d, result: %d", requestCode, resultCode);
+        }
+    }
+
+    public void readReturnBitmap(int requestCode, int resultCode, Intent data) {
+        log.i("result %d, %d, %s", requestCode, resultCode, data);
+        if (resultCode != Activity.RESULT_OK) {
+            log.i("the image wasn't edited");
+            return;
+        }
+        // Some app returns the edited image as new data.
+        if (data != null) {
+            log.i("result uri: %s", data.getData());
+            try {
+                openImage(MediaStore.Images.Media.getBitmap(getContentResolver(), data.getData()));
+            } catch (IOException e) {
+                showToast("Cannot load new image");
+                log.e("cannot load edited image", e);
+            } catch (SecurityException e) {
+                // TODO add storage read permission request and support it.
+                log.e("Storage permission is required", e);
+                showToast("Need storage permission");
+            }
+        } else { // Others overwrite the same
+            log.i("loading temporary file; %s", _editedFile.getAbsolutePath());
+            Bitmap bmp = BitmapFactory.decodeFile(_editedFile.getAbsolutePath());
+            if (bmp == null) {
+                log.e("cannot load the image on file %s", _editedFile.getAbsolutePath());
+            } else {
+                openImage(bmp);
+            }
         }
     }
 
@@ -369,6 +413,60 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show());
     }
 
+
+    private File getNewTempFile() throws IOException {
+        // Directory defined in provider_paths.xml
+        File cachePath = new File(getExternalCacheDir(), "shared_images");
+        cachePath.mkdirs();
+        for ( File f: cachePath.listFiles() ) {
+            log.i("deleting old temporary file %s", f.getAbsolutePath());
+            f.delete();
+        }
+        // Some apps (com.google.android.markup) seems to have a very aggressive cache, they don't
+        // realize that the file changed, so we have to generate a new file name to be safe.
+        return File.createTempFile("img_", ".png", cachePath);
+    }
+
+    private boolean editImage() {
+        Bitmap bmp = _myPagerAdapter.getPreviewFragment().getBitmap();
+
+        if (bmp == null) {
+            log.w("nothing to edit");
+            return false;
+        }
+
+        // https://codestringz.com/share-intent-for-a-bitmap-without-saving-a-file/
+        // https://stackoverflow.com/questions/15699299/android-edit-image-intent
+
+
+        try {
+            _editedFile = getNewTempFile();
+            log.i("writing temporary file on %s", _editedFile.getAbsolutePath());
+            FileOutputStream fos = new FileOutputStream(_editedFile);
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.close();
+        } catch (IOException e) {
+            log.e("cannot write temporary file", e);
+            showToast("ERROR: writing temporary file");
+            return true;
+        }
+
+        Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", _editedFile);
+
+        Intent intent = new Intent(Intent.ACTION_EDIT);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+        // com.google.android.markup gets the image from here.
+        intent.setDataAndType(uri, "image/png");
+
+        // Snapseed gets the image from here.
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+
+        log.i("sending uri %s, intent %s", uri, intent);
+
+        startActivityForResult(Intent.createChooser(intent, "Edit in"), REQUEST_EDIT_IMAGE);
+        return true;
+    }
 }
 
 

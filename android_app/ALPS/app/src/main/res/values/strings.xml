@@ -53,4 +53,5 @@
         along with this program.  If not, see
         <a href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>.
     </string>
+    <string name="action_edit_image">Edit...</string>
 </resources>
