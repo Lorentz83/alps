@@ -11,6 +11,7 @@ import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -29,6 +30,8 @@ import com.github.lorentz83.alps.utils.LogUtility;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class EditImageActivity extends AppCompatActivity {
     private final static LogUtility log = new LogUtility(EditImageActivity.class);
@@ -158,10 +161,13 @@ public class EditImageActivity extends AppCompatActivity {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
             // com.google.android.markup gets the image from here.
-            intent.setDataAndType(_uri, "image/png");
+            intent.setDataAndType(_uri, "image/*");
 
             // Snapseed gets the image from here.
             intent.putExtra(Intent.EXTRA_STREAM, _uri);
+
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, _uri); // set the image file name
+
 
             log.i("sending uri %s, intent %s", _uri, intent);
             startActivityForResult(Intent.createChooser(intent, "Edit in"), REQUEST_EDIT_IMAGE);
@@ -171,30 +177,37 @@ public class EditImageActivity extends AppCompatActivity {
         }
     }
 
-    public void readReturnBitmap(Intent data) {
-        log.i("read bitmap from intent: %s", data);
-        // Some app returns the edited image as new data.
-        if (data != null) {
-            log.i("result uri: %s", data.getData());
-            try {
-                setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(), data.getData()));
-            } catch (IOException e) {
-                showToast("Cannot load new image");
-                log.e("cannot load edited image", e);
-            } catch (SecurityException e) {
-                if (!_storagePermissionRequest.askPermission(()->{readReturnBitmap(data);})) {
-                    showToast("Cannot read the image");
-                    log.e("storage permission is granted but cannot read image", e);
-                }
-                log.w("missing read storage permission", e);
+    private void readReturnBitmap(Uri uri) {
+        if (uri.toString().startsWith("content://com.google.android.apps.snapseed/snapseed/")) {
+            // This is honestly awful. But after wasting one day I couldn't find any better solution.
+            // The content:// uri should be an opaque identifier, but snapseed doesn't give rights
+            // to read it.
+            // After some testing I noticed that the last component of the URI is the filename, and
+            // that snapseed stores all the files in a single directory.
+            // This code relies on this, but it may (and very likely will) break in the future.
+            String fname = uri.toString().replace("content://com.google.android.apps.snapseed/snapseed/", "");
+            Path p = Paths.get(Environment.getExternalStorageDirectory().getAbsolutePath(), "Snapseed", fname);
+            Uri fileUri = Uri.fromFile(p.toFile());
+            log.i("snapseed new uri: %s", fileUri);
+
+            if (!_storagePermissionRequest.hasPermission()) {
+                log.i("asking for storage permission");
+                _storagePermissionRequest.askPermission(() -> {
+                    readReturnBitmap(fileUri);
+                });
+                return;
             }
-        } else { // Others overwrite the same
-            try {
-                setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(), _uri));
-            } catch (IOException e) {
-                log.e("cannot read back temporary file", e);
-                showToast("Cannot read image");
-            }
+            uri = fileUri;
+        }
+
+        try {
+            setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(), uri));
+        } catch (IOException e) {
+            showToast("Error loading the new image");
+            log.e("cannot load edited image", e);
+        } catch (SecurityException e) {
+            showToast("Don't have permission to read the image");
+            log.e("SecurityException, cannot read image", e);
         }
     }
 
@@ -204,7 +217,10 @@ public class EditImageActivity extends AppCompatActivity {
         log.i("onActivityResult %d, result: %d", requestCode, resultCode);
 
         if (requestCode == REQUEST_EDIT_IMAGE && resultCode == Activity.RESULT_OK) {
-            readReturnBitmap(data);
+            if (data != null)
+                readReturnBitmap(data.getData());
+            else
+                readReturnBitmap(_uri);
         }
     }
 
@@ -220,7 +236,7 @@ public class EditImageActivity extends AppCompatActivity {
 class StoragePermissionRequest {
     private final static LogUtility log = new LogUtility(StoragePermissionRequest.class);
 
-    private final AlertDialog.Builder _infDialog;
+    private final AlertDialog.Builder _infoDialog;
     private final AlertDialog.Builder _denialExplanation;
     private final ActivityResultLauncher<String> _requestStoragePermissionLauncher;
     private final AppCompatActivity _ctx;
@@ -252,13 +268,10 @@ class StoragePermissionRequest {
                     }
                 });
 
-        _infDialog = new AlertDialog.Builder(ctx)
+        _infoDialog = new AlertDialog.Builder(ctx)
                 .setTitle("Storage permission required")
-                .setMessage("The app you chose didn't share the image with ALPS after editing it.\nThe storage permission is required to read it. Without it you cannot get the new image.\nDo you want to open a window to grant it?")
-                .setNegativeButton("No", (d, w) -> {
-                    d.dismiss();
-                })
-                .setPositiveButton("Yes", (d, w) -> {
+                .setMessage("The app you chose didn't share the image with ALPS after editing it.\nThe storage permission is required to read it. Without it you cannot get the new image.\nIn the next window you can choose if you want to grant this permission to ALPS.")
+                .setNeutralButton("OK", (d, w) -> {
                     log.i("launching permission request");
                     _requestStoragePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE);
                     d.dismiss();
@@ -267,17 +280,16 @@ class StoragePermissionRequest {
     }
 
     public boolean hasPermission() {
-        return  _ctx.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        return _ctx.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
-    public boolean askPermission(OnGranted onGranted) {
+    public void askPermission(OnGranted onGranted) {
         if ( hasPermission() ) {
-            log.i("READ_EXTERNAL_STORAGE has been granted already, skipping ask permission");
-            return false;
+            log.w("READ_EXTERNAL_STORAGE has been granted already");
+            return;
         }
         log.i("asking user for READ_EXTERNAL_STORAGE");
         _onGranted = onGranted;
-        _requestStoragePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE);
-        return true;
+        _infoDialog.show();
     }
 }
