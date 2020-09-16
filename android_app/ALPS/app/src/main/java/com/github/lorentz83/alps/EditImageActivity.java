@@ -1,11 +1,14 @@
 package com.github.lorentz83.alps;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -15,6 +18,9 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuCompat;
@@ -29,6 +35,8 @@ public class EditImageActivity extends AppCompatActivity {
 
     private final static int REQUEST_EDIT_IMAGE = 1234;
 
+    private StoragePermissionRequest _storagePermissionRequest;
+
     private ImageView _preview;
     private Bitmap _bmp;
     private Uri _uri;
@@ -36,6 +44,9 @@ public class EditImageActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        _storagePermissionRequest = new StoragePermissionRequest(this);
+
         setContentView(R.layout.activity_edit_image);
 
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -73,14 +84,14 @@ public class EditImageActivity extends AppCompatActivity {
         });
 
         ImageButton externalEdit = findViewById(R.id.external_edit);
-        externalEdit.setOnClickListener(v -> {callExternalEditor();});
-
+        externalEdit.setOnClickListener(v -> {
+            callExternalEditor();
+        });
 
         try {
-            //intent.putExtra(Intent.EXTRA_STREAM, uri);
             _uri = getIntent().getData();
             log.i("get stream %s", _uri);
-            setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(),_uri));
+            setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(), _uri));
         } catch (IOException e) {
             // TODO handle it.
             log.w("NO IMAGE");
@@ -93,7 +104,9 @@ public class EditImageActivity extends AppCompatActivity {
 
     private void setBitmap(Bitmap bmp) {
         _bmp = bmp;
-        _preview.setImageBitmap(_bmp);
+        BitmapDrawable myBitmapDrawable = new BitmapDrawable(getResources(), _bmp);
+        myBitmapDrawable.getPaint().setFilterBitmap(false);
+        _preview.setImageDrawable(myBitmapDrawable);
     }
 
     @Override
@@ -151,14 +164,15 @@ public class EditImageActivity extends AppCompatActivity {
             intent.putExtra(Intent.EXTRA_STREAM, _uri);
 
             log.i("sending uri %s, intent %s", _uri, intent);
-        startActivityForResult(Intent.createChooser(intent, "Edit in"), REQUEST_EDIT_IMAGE);
+            startActivityForResult(Intent.createChooser(intent, "Edit in"), REQUEST_EDIT_IMAGE);
         } catch (IOException e) {
-           log.e("IO error", e);
-           showToast("cannot save temporary file");
+            log.e("IO error", e);
+            showToast("cannot save temporary file");
         }
     }
 
     public void readReturnBitmap(Intent data) {
+        log.i("read bitmap from intent: %s", data);
         // Some app returns the edited image as new data.
         if (data != null) {
             log.i("result uri: %s", data.getData());
@@ -168,13 +182,15 @@ public class EditImageActivity extends AppCompatActivity {
                 showToast("Cannot load new image");
                 log.e("cannot load edited image", e);
             } catch (SecurityException e) {
-                // TODO add storage read permission request and support it.
-                log.e("Storage permission is required", e);
-                showToast("Need storage permission");
+                if (!_storagePermissionRequest.askPermission(()->{readReturnBitmap(data);})) {
+                    showToast("Cannot read the image");
+                    log.e("storage permission is granted but cannot read image", e);
+                }
+                log.w("missing read storage permission", e);
             }
         } else { // Others overwrite the same
             try {
-                setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(),_uri));
+                setBitmap(MediaStore.Images.Media.getBitmap(getContentResolver(), _uri));
             } catch (IOException e) {
                 log.e("cannot read back temporary file", e);
                 showToast("Cannot read image");
@@ -195,5 +211,73 @@ public class EditImageActivity extends AppCompatActivity {
     private void showToast(final String msg) {
         final Context ctx = this;
         runOnUiThread(() -> Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show());
+    }
+}
+
+/**
+ * Helper to handle the READ_EXTERNAL_STORAGE permission request.
+ */
+class StoragePermissionRequest {
+    private final static LogUtility log = new LogUtility(StoragePermissionRequest.class);
+
+    private final AlertDialog.Builder _infDialog;
+    private final AlertDialog.Builder _denialExplanation;
+    private final ActivityResultLauncher<String> _requestStoragePermissionLauncher;
+    private final AppCompatActivity _ctx;
+
+    private OnGranted _onGranted = null;
+
+    public interface OnGranted {
+        /**
+         * Called if the StoragePermissionRequest has been granted.
+         */
+        void execute();
+    }
+
+    public StoragePermissionRequest(@NonNull AppCompatActivity ctx) {
+        _ctx = ctx;
+        _denialExplanation = new AlertDialog.Builder(ctx)
+                .setTitle("Storage permission")
+                .setMessage("The storage permission is required only because some external apps don't grant read access to their edited images.\nYou can try to use another external app to edit your images if you don't want to grant this permission.")
+                .setNeutralButton("OK", (dialog, which) -> dialog.dismiss());
+
+        _requestStoragePermissionLauncher =
+                ctx.registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+                    if (isGranted) {
+                        if (_onGranted != null) {
+                            _onGranted.execute();
+                        }
+                    } else {
+                        _denialExplanation.show();
+                    }
+                });
+
+        _infDialog = new AlertDialog.Builder(ctx)
+                .setTitle("Storage permission required")
+                .setMessage("The app you chose didn't share the image with ALPS after editing it.\nThe storage permission is required to read it. Without it you cannot get the new image.\nDo you want to open a window to grant it?")
+                .setNegativeButton("No", (d, w) -> {
+                    d.dismiss();
+                })
+                .setPositiveButton("Yes", (d, w) -> {
+                    log.i("launching permission request");
+                    _requestStoragePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE);
+                    d.dismiss();
+                });
+
+    }
+
+    public boolean hasPermission() {
+        return  _ctx.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public boolean askPermission(OnGranted onGranted) {
+        if ( hasPermission() ) {
+            log.i("READ_EXTERNAL_STORAGE has been granted already, skipping ask permission");
+            return false;
+        }
+        log.i("asking user for READ_EXTERNAL_STORAGE");
+        _onGranted = onGranted;
+        _requestStoragePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE);
+        return true;
     }
 }
