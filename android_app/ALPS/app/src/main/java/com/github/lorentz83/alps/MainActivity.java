@@ -360,40 +360,24 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
             case REQUEST_EDIT_IMAGE: {
-                readReturnBitmap(requestCode, resultCode, data);
+                if (resultCode != Activity.RESULT_OK) {
+                    log.i("the image wasn't edited");
+                } else {
+                    readReturnBitmap();
+                }
             }
             default:
                 log.i("onActivityResult unknown code %d, result: %d", requestCode, resultCode);
         }
     }
 
-    public void readReturnBitmap(int requestCode, int resultCode, Intent data) {
-        log.i("result %d, %d, %s", requestCode, resultCode, data);
-        if (resultCode != Activity.RESULT_OK) {
-            log.i("the image wasn't edited");
-            return;
-        }
-        // Some app returns the edited image as new data.
-        if (data != null) {
-            log.i("result uri: %s", data.getData());
-            try {
-                openImage(MediaStore.Images.Media.getBitmap(getContentResolver(), data.getData()));
-            } catch (IOException e) {
-                showToast("Cannot load new image");
-                log.e("cannot load edited image", e);
-            } catch (SecurityException e) {
-                // TODO add storage read permission request and support it.
-                log.e("Storage permission is required", e);
-                showToast("Need storage permission");
-            }
-        } else { // Others overwrite the same
-            log.i("loading temporary file; %s", _editedFile.getAbsolutePath());
-            Bitmap bmp = BitmapFactory.decodeFile(_editedFile.getAbsolutePath());
-            if (bmp == null) {
-                log.e("cannot load the image on file %s", _editedFile.getAbsolutePath());
-            } else {
-                openImage(bmp);
-            }
+    public void readReturnBitmap() {
+        log.i("loading temporary file; %s", _editedFile.getAbsolutePath());
+        Bitmap bmp = BitmapFactory.decodeFile(_editedFile.getAbsolutePath());
+        if (bmp == null) {
+            log.e("cannot load the image on file %s", _editedFile.getAbsolutePath());
+        } else {
+            openImage(bmp);
         }
     }
 
@@ -428,6 +412,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean editImage() {
+        // TODO passing and reading back files to/from different activities is done already in EditImageActivity.
+        // Remove some duplication.
         Bitmap bmp = _myPagerAdapter.getPreviewFragment().getBitmap();
 
         if (bmp == null) {
@@ -453,18 +439,10 @@ public class MainActivity extends AppCompatActivity {
 
         Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", _editedFile);
 
-        Intent intent = new Intent(Intent.ACTION_EDIT);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-
-        // com.google.android.markup gets the image from here.
+        Intent intent = new Intent(this, EditImageActivity.class);
         intent.setDataAndType(uri, "image/png");
-
-        // Snapseed gets the image from here.
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-
         log.i("sending uri %s, intent %s", uri, intent);
-
-        startActivityForResult(Intent.createChooser(intent, "Edit in"), REQUEST_EDIT_IMAGE);
+        startActivityForResult(intent, REQUEST_EDIT_IMAGE);
         return true;
     }
 }

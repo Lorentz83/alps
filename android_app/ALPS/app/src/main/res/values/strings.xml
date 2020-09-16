@@ -54,4 +54,5 @@
         <a href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>.
     </string>
     <string name="action_edit_image">Edit...</string>
+    <string name="title_activity_edit_image">Edit image</string>
 </resources>

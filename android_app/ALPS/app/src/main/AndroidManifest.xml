@@ -17,7 +17,11 @@
         <activity
             android:name=".CustomTextActivity"
             android:label="@string/title_activity_custom_text"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".EditImageActivity"
+            android:label="@string/title_activity_edit_image"
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation"

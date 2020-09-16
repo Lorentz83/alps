@@ -93,7 +93,7 @@ public class CustomTextActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_custom_text, menu);
+        getMenuInflater().inflate(R.menu.activity_ok_menu, menu);
         MenuCompat.setGroupDividerEnabled(menu, true);
         return true;
     }
