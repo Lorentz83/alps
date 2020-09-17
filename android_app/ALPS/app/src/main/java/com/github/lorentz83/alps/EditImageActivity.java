@@ -105,6 +105,8 @@ public class EditImageActivity extends AppCompatActivity {
         adapter.add(OverlayBuilder.noOverlay()); // No overlay must be the 1st. It is used later to disable the overlay.
         adapter.add(OverlayBuilder.horizontalStripes());
         adapter.add(OverlayBuilder.verticalStripes());
+        adapter.add(OverlayBuilder.chessboard());
+        adapter.add(OverlayBuilder.rectangles());
 
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
