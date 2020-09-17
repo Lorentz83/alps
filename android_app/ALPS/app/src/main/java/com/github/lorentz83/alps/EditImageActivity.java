@@ -107,6 +107,8 @@ public class EditImageActivity extends AppCompatActivity {
         adapter.add(OverlayBuilder.verticalStripes());
         adapter.add(OverlayBuilder.chessboard());
         adapter.add(OverlayBuilder.rectangles());
+        adapter.add(OverlayBuilder.diagonalDown());
+        adapter.add(OverlayBuilder.diagonalUp());
 
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
