@@ -30,11 +30,11 @@
             android:scaleType="fitCenter"
             app:layout_constraintBottom_toTopOf="@+id/linearLayout"
             app:layout_constraintDimensionRatio="1:1"
-            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.468" />
+            app:layout_constraintVertical_bias="0.309" />
 
         <LinearLayout
             android:id="@+id/linearLayout"
@@ -47,45 +47,87 @@
 
             <ImageButton
                 android:id="@+id/external_edit"
-                android:tooltipText="Edit in external app"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:tooltipText="Edit in external app"
                 app:srcCompat="@android:drawable/ic_menu_edit" />
 
             <ImageButton
                 android:id="@+id/rotate_clockwise"
-                android:tooltipText="Rotate clockwise"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:tooltipText="Rotate clockwise"
                 app:srcCompat="@drawable/ic_rotate_c" />
 
             <ImageButton
                 android:id="@+id/rotate_counterclockwise"
-                android:tooltipText="Rotate counterclockwise"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:tooltipText="Rotate counterclockwise"
                 app:srcCompat="@drawable/ic_rotate_ccw" />
 
             <ImageButton
                 android:id="@+id/vertical_mirror"
-                android:tooltipText="Mirror vertically"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:tooltipText="Mirror vertically"
                 app:srcCompat="@drawable/ic_mirror_v" />
 
             <ImageButton
                 android:id="@+id/horizontal_mirror"
-                android:tooltipText="Mirror horizontally"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:tooltipText="Mirror horizontally"
                 app:srcCompat="@drawable/ic_mirror_h" />
 
         </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toTopOf="@+id/linearLayout"
+            app:layout_constraintTop_toBottomOf="@+id/image_preview"
+            app:layout_constraintVertical_bias="1.0">
+
+            <Spinner
+                android:id="@+id/overlay_type"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="50"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="50"
+                android:orientation="vertical">
+
+                <SeekBar
+                    android:id="@+id/overlay_param_1"
+                    style="@style/Widget.AppCompat.SeekBar.Discrete"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="20"
+                    android:progress="1" />
+
+                <SeekBar
+                    android:id="@+id/overlay_param_2"
+                    style="@style/Widget.AppCompat.SeekBar.Discrete"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="20"
+                    android:progress="1" />
+
+            </LinearLayout>
+
+
+        </LinearLayout>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.appcompat.widget.Toolbar

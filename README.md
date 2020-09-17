@@ -26,7 +26,6 @@ An unordered list of stuff I'd like to work on:
   - check if I can push bluetooth faster using a Teensy board
 - on the Android side:
   - re-design the whole app UI/UX (any help is appreciated)
-  - simple in-app edit support (rotate and mirrow to start)
   - add gradient/pattern generators
   - write some unit test
 
