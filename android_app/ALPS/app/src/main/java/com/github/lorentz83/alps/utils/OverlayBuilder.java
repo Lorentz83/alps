@@ -40,6 +40,12 @@ public class OverlayBuilder {
          * @return the name of this overlay.
          */
         String toString();
+
+        /**
+         * Can be used to check if apply actually changes the image.
+         * @return true if tis is a dummy overlayer.
+         */
+        default boolean isDummy() { return false; }
     }
 
     private static class PaintTools {
@@ -101,6 +107,9 @@ public class OverlayBuilder {
     private static Bitmap applyDiagonal(Bitmap original, int p1, int p2, boolean up) {
         PaintTools t = new PaintTools(original);
 
+        Paint p = new Paint(black);
+        p.setAntiAlias(true);
+
         int w = t.bmp.getWidth();
         int h = t.bmp.getHeight();
 
@@ -122,7 +131,7 @@ public class OverlayBuilder {
 
         // iterate over the translations of the 1st origin is x == -(w+p1)
         for ( int x = -(w+p1) ; x < w ; x = x + p1 + p2 ) {
-            t.c.drawPath(diagonal, black);
+            t.c.drawPath(diagonal, p);
             diagonal.transform(translate);
         }
 
@@ -145,6 +154,11 @@ public class OverlayBuilder {
             @Override
             public String toString() {
                 return "No overlay";
+            }
+
+            @Override
+            public boolean isDummy() {
+                return true;
             }
         };
     }
@@ -192,11 +206,11 @@ public class OverlayBuilder {
     }
 
     /**
-     * Returns an overlayer to apply a chessboard pattern.
+     * Returns an overlayer to apply a square pattern.
      *
-     * @return a chessboard pattern overlayer.
+     * @return a square pattern overlayer.
      */
-    public static OverlayBuilder.Overlayer chessboard() {
+    public static OverlayBuilder.Overlayer squares() {
         return new OverlayBuilder.Overlayer() {
             @Override
             public Bitmap apply(Bitmap original, int p1, int p2) {
@@ -205,7 +219,7 @@ public class OverlayBuilder {
 
             @Override
             public String toString() {
-                return "Chessboard";
+                return "Squares";
             }
         };
     }

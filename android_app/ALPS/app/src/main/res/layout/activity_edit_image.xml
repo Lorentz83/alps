@@ -119,7 +119,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:max="20"
-                    android:progress="1" />
+                    android:progress="4" />
 
                 <SeekBar
                     android:id="@+id/overlay_param_2"
@@ -127,7 +127,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:max="20"
-                    android:progress="1" />
+                    android:progress="8" />
 
             </LinearLayout>
 

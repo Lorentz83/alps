@@ -101,14 +101,16 @@ public class EditImageActivity extends AppCompatActivity {
             callExternalEditor();
         });
 
-        ArrayAdapter<OverlayBuilder.Overlayer> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item);
-        adapter.add(OverlayBuilder.noOverlay()); // No overlay must be the 1st. It is used later to disable the overlay.
-        adapter.add(OverlayBuilder.horizontalStripes());
-        adapter.add(OverlayBuilder.verticalStripes());
-        adapter.add(OverlayBuilder.chessboard());
-        adapter.add(OverlayBuilder.rectangles());
-        adapter.add(OverlayBuilder.diagonalDown());
-        adapter.add(OverlayBuilder.diagonalUp());
+        ArrayAdapter<OverlayBuilder.Overlayer> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, new OverlayBuilder.Overlayer[]{
+            OverlayBuilder.noOverlay(), // No overlay must be the 1st. It is used later to disable the overlay.
+            OverlayBuilder.horizontalStripes(),
+            OverlayBuilder.verticalStripes(),
+            OverlayBuilder.squares(),
+            OverlayBuilder.rectangles(),
+            OverlayBuilder.diagonalDown(),
+            OverlayBuilder.diagonalUp(),
+        });
 
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
@@ -117,7 +119,6 @@ public class EditImageActivity extends AppCompatActivity {
 
         _overlayParam1 = findViewById(R.id.overlay_param_1);
         _overlayParam2 = findViewById(R.id.overlay_param_2);
-
 
         SeekBar.OnSeekBarChangeListener paramListener = new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -138,6 +139,9 @@ public class EditImageActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
                 log.i("overlay.onItemSelected(%s, %s, %s)", selectedItemView, position, id);
+                boolean enableParams = position != 0;
+                _overlayParam1.setEnabled(enableParams);
+                _overlayParam2.setEnabled(enableParams);
                 setBitmap(_bmp);
             }
 
@@ -171,7 +175,25 @@ public class EditImageActivity extends AppCompatActivity {
 
     private Bitmap getOverlaidBitmap() {
         OverlayBuilder.Overlayer overlayer = (OverlayBuilder.Overlayer) _overlay.getSelectedItem();
-        return overlayer.apply(_bmp, _overlayParam1.getProgress() + 1, _overlayParam2.getProgress() + 1);
+        Bitmap bmp = _bmp;
+
+        if ( ! overlayer.isDummy() ) {
+            int w = bmp.getWidth();
+            int h = bmp.getHeight();
+
+            int len = Preferences.getInstance().getStickLength();
+            // TODO should we consider getWidthMultiplier() ?
+            w = (int) Math.round((double) len / h * w);
+            h = len;
+
+            // bilinear scaling down, nearest neighbor scaling up.
+            // TODO this is pretty much copy and paste from PreviewFragment, refactor it out.
+            boolean useBilinear = _bmp.getHeight() > h;
+
+            bmp = Bitmap.createScaledBitmap(bmp, w, h, useBilinear);
+        }
+
+        return overlayer.apply(bmp, _overlayParam1.getProgress() + 1, _overlayParam2.getProgress() + 1);
     }
 
     @Override
