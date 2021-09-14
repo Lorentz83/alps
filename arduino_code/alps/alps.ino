@@ -18,6 +18,9 @@
  */
 
 
+#include <SPI.h>
+#include <SD.h>
+
 // Files are concatenated by filename.
 // This file contains arduino specific configuration and globals.
 

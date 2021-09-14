@@ -39,12 +39,6 @@ class LedControl {
 
     void off() {
       pixels.fill(pixels.Color(0, 0, 0));
-
-//      // TODO remove this
-//      setPixelColor(1, 255, 0, 0);
-//      setPixelColor(2, 0, 255, 0);
-//      setPixelColor(3, 0, 0, 255);
-
       pixels.show();
     }
 

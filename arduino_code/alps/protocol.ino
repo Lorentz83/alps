@@ -19,8 +19,6 @@
 
 
 #include <stdarg.h>
-#include <SPI.h>
-#include <SD.h>
 
 class Protocol {
 

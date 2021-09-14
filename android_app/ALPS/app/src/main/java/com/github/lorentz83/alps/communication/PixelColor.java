@@ -20,8 +20,6 @@
 
 package com.github.lorentz83.alps.communication;
 
-import android.graphics.Color;
-
 import java.util.Objects;
 
 /**
@@ -59,10 +57,10 @@ public class PixelColor {
             throw new IllegalArgumentException("brightness value must in [0, 1]");
         }
 
-        int alpha = Color.alpha(argb);
-        int r = Color.red(argb);
-        int g = Color.green(argb);
-        int b = Color.blue(argb);
+        int alpha = argb >>> 24;
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;;
 
         red = (byte) Math.round((brightness * alpha) / 255.0 * r);
         green = (byte) Math.round((brightness * alpha) / 255.0 * g);

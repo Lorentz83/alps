@@ -78,6 +78,15 @@ public class Protocol {
     }
 
     /**
+     * Sets up the protocol to connect to the specified streams.
+     */
+    public void initializeConnection(@NonNull InputStream in, @NonNull OutputStream out) {
+        _in = in;
+        _out = out;
+    }
+
+
+    /**
      * Blocks until len bytes are available and puts them in the buffer.
      *
      * @param buf the buffer to fill.
@@ -109,6 +118,7 @@ public class Protocol {
 
     private void sendOnly(byte[] buf, int len) throws IOException {
         _out.write(buf, 0, len);
+        _out.flush();
     }
 
     private void sendAndWaitForAck(byte[] buf, int len) throws IOException {
