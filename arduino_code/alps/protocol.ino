@@ -1,24 +1,27 @@
 /**
- *  Copyright 2020 Lorenzo Bossi
- *
- *  This file is part of ALPS (Another Light Painting Stick).
- *
- *  ALPS is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  ALPS is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with ALPS.  If not, see <https://www.gnu.org/licenses/>.
- */
+    Copyright 2020 Lorenzo Bossi
+
+    This file is part of ALPS (Another Light Painting Stick).
+
+    ALPS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    ALPS is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with ALPS.  If not, see <https://www.gnu.org/licenses/>.
+*/
 
 
 #include <stdarg.h>
+
+// Status is used together the [[nodiscard]] attribute to generate warnings when an error is ignored.
+class Status {};
 
 class Protocol {
 
@@ -48,19 +51,19 @@ class Protocol {
     uint8_t sBrightness = 0;
     byte sLoop = 0;
 
-    void errorf(int line, String msg);
+    [[nodiscard]] Status errorf(int line, String msg);
     void debugf(int line, const char* msg, ...);
-    void ackf(int line);
+    [[nodiscard]] Status ackf(int line);
 
     int readByte();
 
-    void handleOff();
-    void handleReady();
-    void handleColumn();
-    void handleUpload();
-    void handleReshow();
-    void handleSettings();
-    
+    Status handleOff();
+    Status handleReady();
+    Status handleColumn();
+    Status handleUpload();
+    Status handleReshow();
+    Status handleSettings();
+
   public:
     Protocol(LedControl *callbacks, Stream* io, Stream* debug);
     ~Protocol();
@@ -71,7 +74,7 @@ class Protocol {
 void Protocol::debugf(int line, const char* msg, ...) {
   static const size_t debugBufLen = 40;
   static char debugbuf[debugBufLen];
-  
+
   if (!ds) {
     return;
   }
@@ -86,21 +89,23 @@ void Protocol::debugf(int line, const char* msg, ...) {
   ds->println(debugbuf);
 }
 
-void Protocol::errorf(int line, String msg) {
+Status Protocol::errorf(int line, String msg) {
   snprintf(obuf, olen + 1, "k%04d", line);
   io->write(obuf, olen);
 
-  debugf(line, msg.c_str());
+  debugf(line, "%s", msg.c_str());
 
   // flush input
   int b = io->available();
   while (b-- > 0)
     io->read();
+  return Status{};
 }
 
-void Protocol::ackf(int line) {
+Status Protocol::ackf(int line) {
   snprintf(obuf, olen + 1, "o%04d", line);
   io->write(obuf, olen);
+  return Status{};
 }
 
 
@@ -110,12 +115,12 @@ void Protocol::ackf(int line) {
 
 Protocol::Protocol(LedControl *callbacks, Stream* io, Stream* ds): callbacks(callbacks), io(io), ds(ds), maxPixels(callbacks->numPixels()), blen(maxPixels * 3) {
   // NOTE: here streams are not initialized yet.
-  
+
   buf = (byte*) malloc( sizeof(*buf) * blen );
 }
 
 Protocol::~Protocol() {
-  free(buf);  
+  free(buf);
 }
 
 int Protocol::readByte() {
@@ -125,71 +130,67 @@ int Protocol::readByte() {
   return buf[0];
 }
 
-void Protocol::handleReady() {
+Status Protocol::handleReady() {
   if (readByte() != 2) {
-    error("unexpected ready message");
-    return;
+    return error("unexpected ready message");
   }
   if (callbacks->isButtonPressed()) {
-    error("not ready");
+    return error("not ready");
   } else {
-    ack();
+    return ack();
   }
 }
 
-void Protocol::handleOff() {
+Status Protocol::handleOff() {
   if (readByte() != 2) {
-    error("unexpected off message");
-    return;
+    return error("unexpected off message");
   }
   callbacks->off();
-  ack();
+  return ack();
 }
 
-void Protocol::handleColumn() {
+Status Protocol::handleColumn() {
   int pixels = readByte();
-    
+
   if ( (unsigned int)pixels > maxPixels ) {
-    error("column too long");
+    return error("column too long");
   }
 
   for (int pixelPos = 0; pixelPos < pixels; pixelPos ++) {
     int r = io->readBytes(buf, 3);
     if (r != 3) {
       debug("incomplete pixel %d: %d", pixelPos, r);
-      error("incomplete pixel");
-      break;
+      return error("incomplete pixel");
     }
     callbacks->setPixelColor(pixelPos, buf[0], buf[1], buf[2]);
   }
   callbacks->show();
-  ack();
+  return ack();
 }
 
-void Protocol::handleUpload() {
+Status Protocol::handleUpload() {
   File myFile = SD.open("ledcode.txt", O_READ | O_WRITE | O_CREAT | O_TRUNC);
   if (!myFile) {
-    error("cannot open file");
-    return;
+    return error("cannot open file");
   }
 
   size_t r = io->readBytes(buf, 3);
   if ( r != 3 ) {
-    error("wrong upload header");
+    return error("wrong upload header");
   }
-  
+
   byte h = buf[0];
   if ( h > maxPixels ) {
-    error("image too high");
+    return error("image too high");
   }
 
   unsigned int w = ( ((unsigned int)buf[1]) << 8) + buf[2];
 
   if ( myFile.write(buf, 3) != 3 ) {
-    error("cannot write file");
+    return error("cannot write file");
   }
 
-  ack();
+  (void) ack(); // Ignore [[nodiscard]]
 
   size_t toRead = h * 3;
 
@@ -197,45 +198,49 @@ void Protocol::handleUpload() {
     r = io->readBytes(buf, toRead);
     if (r != toRead) {
       debug("incomplete col %d read %d bytes", x, r);
-      error("incomplete pixel");
-      myFile.close();
-      return;
+      return error("incomplete pixel");
     }
     if ( myFile.write(buf, toRead) != toRead) {
-      error("cannot write file");
-      myFile.close();
-      return;
+      return error("cannot write file");
     }
 
     myFile.flush();
     debug("up ack %d col", x);
-    ack();
+    (void) ack(); // Ignore [[nodiscard]]
   }
 
-  myFile.close();
+  return Status{};
 }
 
-void Protocol::handleReshow() {
+Status Protocol::handleReshow() {
   if ( !doReshow() ) {
-    error("error reading file");
+    return error("error reading file");
   } else {
-    ack();
+    return ack();
   }
 }
 
-void Protocol::handleSettings() {
+Status Protocol::handleSettings() {
   size_t r = io->readBytes(buf, 3);
   if ( r != 3 ) {
-    error("cannot read settings");
-    return;
+    return error("cannot read settings");
   }
 
   sDelay = buf[0] * 10;
   sBrightness = buf[1] + 1;
   sLoop = buf[2];
 
-  ack();
+  return ack();
 }
+
+class FileCloser {
+    File &f;
+  public:
+    FileCloser(File &f) : f(f) {}
+    ~FileCloser() {
+      f.close();
+    }
+};
 
 // This function can be triggered from a button, so it shouldn't be part of the communication protocol.
 int Protocol::doReshow() {
@@ -245,6 +250,7 @@ int Protocol::doReshow() {
     callbacks->flashError();
     return 0;
   }
+  FileCloser fc(myFile);
 
   unsigned int h = myFile.read();
   unsigned int wHi = myFile.read();
@@ -275,14 +281,14 @@ int Protocol::doReshow() {
           gg = (gg * sBrightness) >> 8;
           bb = (bb * sBrightness) >> 8;
         }
-        
+
         callbacks->setPixelColor(y, rr, gg, bb);
       }
       callbacks->show();
-      
+
       delay(sDelay);
     }
-  } while( sLoop );
+  } while ( sLoop );
 
 exitLoop:
 
@@ -323,7 +329,7 @@ void Protocol::checkChannel() {
       // nothing to read.
       break;
     default:
-      error("unexpected message");
+      (void) error("unexpected message"); // Ignore [[nodiscard]]
   }
 }
 

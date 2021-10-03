@@ -1,5 +1,10 @@
 package com.github.lorentz83.alps.communication;
 
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,8 +30,8 @@ class Protocol_IntegrationTest {
         assertEquals(0, exit);
     }
 
-    @org.junit.jupiter.api.Timeout(value = 2, unit = SECONDS)
-    @org.junit.jupiter.api.RepeatedTest(30)
+    @Timeout(value = 2, unit = SECONDS)
+    @RepeatedTest(30)
     void writeColumn() throws IOException, InterruptedException {
         Process testing = new ProcessBuilder("./protocol_tester")
                 .directory(new File(testingDir))
@@ -47,9 +52,10 @@ class Protocol_IntegrationTest {
     }
 
 
-    @org.junit.jupiter.api.Test
-    @org.junit.jupiter.api.Timeout(value = 2, unit = SECONDS)
+    @Test
+    @Timeout(value = 2, unit = SECONDS)
     void writeColumn_missingBytes() throws IOException, InterruptedException {
+        // TODO this shouldn't throw but retry.
         Process testing = new ProcessBuilder("./protocol_tester")
                 .directory(new File(testingDir))
                 .redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -72,7 +78,38 @@ class Protocol_IntegrationTest {
             testing.destroy();
         }
     }
+
+    @Test
+    @Timeout(value = 2, unit = SECONDS)
+    @Disabled("TODO")
+    void writeColumn_recoversAfterError() throws IOException, InterruptedException {
+        // TODO this shouldn't throw but retry.
+        Process testing = new ProcessBuilder("./protocol_tester")
+                .directory(new File(testingDir))
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start();
+        try {
+            Protocol p = new Protocol();
+            JammedOutputStream out = new JammedOutputStream(testing.getOutputStream());
+            out.skipRange(10, 12);
+            p.initializeConnection(testing.getInputStream(), out);
+
+            int[] pixels = new int[20];
+            for (int i = 0; i < pixels.length; i++) {
+                pixels[i] = i << 8 | 0xFF000000; // Fully opaque green.
+            }
+
+            assertThrows(ProtocolException.class, () -> {
+                p.writeColumn( new int[200], 1f);
+            });
+            p.writeColumn(pixels, 1f);
+
+        } finally {
+            testing.destroy();
+        }
+    }
 }
+
 
 class JammedOutputStream extends OutputStream {
     private final OutputStream _inner;

@@ -112,6 +112,8 @@ public class Protocol {
 
         readFully(buf, 5);
         if (buf[0] != 'o') {
+            // TODO at this point we should probably reset the bluetooth connection.
+            _in.skip(_in.available());
             throw new ProtocolException("protocol error: nack " + new String(buf));
         }
     }

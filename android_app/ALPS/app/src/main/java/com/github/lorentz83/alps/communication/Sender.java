@@ -142,13 +142,14 @@ class internalSender extends Thread {
     public internalSender(Protocol p, SenderCallbacks callbacks) {
         _p = p;
         _callbacks = callbacks;
+        setName("ProtocolSenderThread"); // Name of the thread for debugging purposes.
     }
 
     @Override
     public void run() {
         try {
             while (true) {
-                // Get all the parameters in a syncronized way.
+                // Get all the parameters in a synchronized way.
 
                 Bitmap bmp = waitForBitmap();
                 log.i("got bitmap");
