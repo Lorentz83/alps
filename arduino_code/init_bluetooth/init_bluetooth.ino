@@ -27,12 +27,11 @@
 
 #define btBaud 9600
 
-
 // Some bluetooth modules require the pullup resistor on the arduino RX pin.
 // This is probably required for the JY-MCU v1.06 bluetooth board.
 // More information at https://forum.arduino.cc/index.php?topic=280928.0
 
-#define PULLUP_PIN 15
+//#define PULLUP_PIN 15
 
 void setup()
 {
@@ -44,30 +43,7 @@ void setup()
 #endif
 
   btSerial.begin(btBaud);
-  
-  // 1 set to 1200bps
-  // 2 set to 2400bps
-  // 3 set to 4800bps
-  // 4 set to 9600bps (Default)
-  // 5 set to 19200bps
-  // 6 set to 38400bps
-  // 7 set to 57600bps
-  // 8 set to 115200bps
-
-  // TODO: other boards require different terminators. Make this configurable
-  
-  btSerial.print("AT+BAUD8");
-
-  // TODO: make pin configurable
-  btSerial.print("AT+PIN1234"); // Set the pin to 1234
-
-  // TODO: make the name suffix configurable
-  btSerial.print("AT+NAMEALPS-01"); // Set the name to ALPS-01
-  
-  // 
-  btSerial.print("AT+VERSION");
-
-  // Useful info at https://www.instructables.com/id/AT-command-mode-of-HC-05-Bluetooth-module/
+  Serial.println("ready");
 }
 
 void loop()
@@ -81,3 +57,31 @@ void loop()
       btSerial.write(Serial.read());
   }
 }
+
+/**
+To run manually in the serial console.
+
+HC-06 JY-MCU v1.06, slow connection tested with Arduino:
+no line terminator
+- set name
+AT+NAMEALPS-01
+- set pin
+AT+PIN1234
+- set speed at 115200bps
+AT+BAUD8
+
+HC-05, faster connection with Teensy
+keeping the button pressed and using the line terminator \r\n
+- set name
+AT+NAME:ALPS-02
+- set pin
+AT+PIN:1234
+- set speed at 1382400bps http://www.techbitar.com/uploads/2/0/3/1/20316977/hc-05_at_commands.pdf
+AT+UART=1382400,0,0
+
+
+Both to check version:
+AT+VERSION
+
+more info at https://www.instructables.com/id/AT-command-mode-of-HC-05-Bluetooth-module/
+*/

@@ -38,18 +38,25 @@ void setup() {
     dbgSerial->println("debug enabled");
   }
 
-  cmdSerial->begin(115200);
+
 #ifdef BT_PULLUP
-  pinMode(15, INPUT_PULLUP); 
+  pinMode(15, INPUT_PULLUP);
+  // This is my personal setup, should make it more generic
+  cmdSerial->begin(115200); // 12 sec 144*x44
+#else
+  cmdSerial->begin(1382400); // 8.25 sec
 #endif
 
   ledControl.init();
 
+#ifdef SD_CS_PIN
   if (!SD.begin(SD_CS_PIN)) {
     ledControl.flashError();
   } else {
     ledControl.flashInit();
   }
+#endif
+
 }
 
 

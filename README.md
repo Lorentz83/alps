@@ -8,8 +8,8 @@ the phone.
 
 
 WARNING: this is a work in progress, it is currently tested on a
-         single Arduino model (Mega ADK board) and on a single
-         Android phone (running Android 9).
+         single ~~Arduino model (Mega ADK board)~~ Teensy4 board
+         and on a single Android phone (running Android 11).
 
 
 ## TODO
@@ -23,7 +23,7 @@ An unordered list of stuff I'd like to work on:
 - on the Arduino side:
   - benchmark the fastled library and decide if it is worth a migration
   - better use of the SD card supporting pre-loaded images
-  - check if I can push bluetooth faster using a Teensy board
+  - ~~check if I can push bluetooth faster using a Teensy board~~
 - on the Android side:
   - re-design the whole app UI/UX (any help is appreciated)
   - add gradient/pattern generators

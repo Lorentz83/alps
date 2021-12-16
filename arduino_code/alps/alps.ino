@@ -39,7 +39,7 @@ HardwareSerial *dbgSerial = NULL;
 // See https://forum.arduino.cc/index.php?topic=280928.0
 // probably only required for JY-MCU v1.06 board.
 // without this you can transmit but not receive.
-#define BT_PULLUP
+//#define BT_PULLUP
 
 // Where the led strip is connected.
 #define LED_STRIP_PIN 6
@@ -49,10 +49,9 @@ HardwareSerial *dbgSerial = NULL;
 
 
 // Which pis is the SD connected?
-// TODO make this optional?
+// Let's disable the SD for now.
 
-#define SD_CS_PIN 46
-// #define SD_CS_PIN 10
+// #define SD_CS_PIN 46
 
 
 // Which pin is the HW button connected
