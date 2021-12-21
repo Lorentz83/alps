@@ -148,7 +148,19 @@ func nlTerminatedData(size int) []byte {
 
 func readUint32(r io.Reader) (uint32, error) {
 	in := make([]byte, 4)
-	n, err := io.ReadFull(r, in)
+	var (
+		err error
+		n   int
+	)
+	for i := 0; i < 5; i++ {
+		// Sometime it gets an EOF, but it can retry and work.
+		// I have no idea why.
+		n, err = io.ReadFull(r, in)
+		if err != io.EOF {
+			break
+		}
+		log.Printf("read error %d: %v", i, err)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("error reading int: %v", err)
 	}
