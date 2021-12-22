@@ -21,9 +21,9 @@ An unordered list of stuff I'd like to work on:
   - add some schematics for the connections
   - add some example photos
 - on the Arduino side:
-  - benchmark the fastled library and decide if it is worth a migration
+  - ~~benchmark the fastled library and decide if it is worth a migration~~ for just writing colors it is much slower!
   - better use of the SD card supporting pre-loaded images
-  - ~~check if I can push bluetooth faster using a Teensy board~~
+  - ~~check if I can push bluetooth faster using a Teensy board~~ YES!
 - on the Android side:
   - re-design the whole app UI/UX (any help is appreciated)
   - add gradient/pattern generators
