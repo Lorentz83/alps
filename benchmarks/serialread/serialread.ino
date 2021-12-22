@@ -41,10 +41,11 @@ void simulateBy3() {
   }
   if (r == 3) {
     // r == 0 is a valid value when no data is in the buffer.
-    pixels.setPixelColor(num / 3, buf3[0], buf3[1], buf3[2]); //
-  }
-  if ( (num % 144) == 0 ) ) {
-    pixels.show();
+    int px = num/3;
+    pixels.setPixelColor(px, buf3[0], buf3[1], buf3[2]); //
+    if ( (px % 144) == 0 ) {
+      pixels.show();
+    }
   }
 }
 
