@@ -24,7 +24,9 @@ go run serialwrite.go
 sudo rfcomm release 0
 */
 var (
-	dev  = flag.String("dev", "/dev/rfcomm0", "serial device to use")
+	dev = flag.String("dev", "/dev/rfcomm0", "serial device to use")
+
+	// Apparently this is not required for rfcomm connections because they can negotiate the speed.
 	baud = flag.Int("baud", 115200, "serial speed")
 )
 
@@ -50,6 +52,7 @@ func main() {
 }
 
 func BenchmarkSend(connection io.ReadWriter) {
+
 	tests := []struct {
 		chunkSize int
 		totalSize int
@@ -58,25 +61,38 @@ func BenchmarkSend(connection io.ReadWriter) {
 		// The connection gets established on the 1st byte sent.
 		// We want to be sure it is on before the real benchmark starts.
 		{3, 3, "single pixel to establish the connection"},
-		// 144 pixels x 3 bytes/pixel = 432 bytes.
-		// wide screen (288 columns) = 124416 bytes.
-		{432, 124416, "wide image in single columns"},
-		{432 * 2, 124416, "wide image in 2 columns"},
-		{432 * 3, 124416, "wide image in 3 columns"},
-		{432 * 4, 124416, "wide image in 4 columns"},
-		{432 * 5, 124416, "wide image in 5 columns"},
-		{432 * 6, 124416, "wide image in 6 columns"},
-		{432 * 7, 124416, "wide image in 7 columns"},
-		{432 * 8, 124416, "wide image in 8 columns"},
-		{432 * 9, 124416, "wide image in 9 columns"},
-		{432 * 10, 124416, "wide image in 10 columns"},
-		{62208, 124416, "wide image in 144 columns"},
-		{124416, 124416, "wide image in full"},
+		// 10 columns only
+		// {3, 144 * 10 * 3, "10 columns in pixels"},
+		// {144 * 3, 144 * 10 * 3, "10 columns in 1 column"},
+		// {144 * 3 * 2, 144 * 10 * 3, "10 columns in 2 columns"},
+		// {144 * 3 * 3, 144 * 10 * 3, "10 columns in 3 columns"},
+		// {144 * 3 * 4, 144 * 10 * 3, "10 columns in 4 columns"},
+		// {144 * 3 * 5, 144 * 10 * 3, "10 columns in 5 columns"},
+		// {144 * 3 * 6, 144 * 10 * 3, "10 columns in 6 columns"},
+		// {144 * 3 * 7, 144 * 10 * 3, "10 columns in 7 columns"},
+		// {144 * 3 * 8, 144 * 10 * 3, "10 columns in 8 columns"},
+		// {144 * 3 * 9, 144 * 10 * 3, "10 columns in 9 columns"},
+		// {144 * 3 * 10, 144 * 10 * 3, "10 columns in full"},
+
+		// Images
+		// {144 * 3, 144 * 44 * 3, "44 columns"},
+
+		// {144 * 3, 144 * 36 * 3, "quarter image"},
+		// {144 * 3, 144 * 72 * 3, "half image"},
+		{144 * 3, 144 * 144 * 3, "square image"},
+		// {144 * 3, 144 * 144 * 3 * 2, "wide image in single columns"},
+		// Multiple columns
+		{144 * 3 * 2, 144 * 144 * 3, "square image in 2 columns"},
+		{144 * 3 * 3, 144 * 144 * 3, "square image in 3 columns"},
+		{144 * 3 * 4, 144 * 144 * 3, "square image in 4 columns"},
+		{144 * 3 * 5, 144 * 144 * 3, "square image in 5 columns"},
+		{144 * 3 * 6, 144 * 144 * 3, "square image in 6 columns"},
 	}
 
 	for _, tt := range tests {
 		fmt.Printf("%s:\n", tt.desc)
-		time, err := sendTestData(connection, tt.chunkSize, tt.totalSize)
+		// time, err := sendTestData(connection, tt.chunkSize, tt.totalSize)
+		time, err := sendPicture(connection, tt.chunkSize, tt.totalSize)
 		if err != nil {
 			fmt.Printf(" ERROR: %v\n", err)
 		} else {
@@ -85,6 +101,95 @@ func BenchmarkSend(connection io.ReadWriter) {
 		}
 		fmt.Println("")
 	}
+}
+
+// Similar to sendTestData but this sends a pattern easier to validate.
+func sendPicture(s io.ReadWriter, chunkSize int, totalSize int) (time.Duration, error) {
+	if chunkSize == 3 {
+		return sendTestData(s, chunkSize, totalSize) // for the test pixel.
+	}
+	if chunkSize%(144*3) != 0 {
+		panic(fmt.Sprintf("chunkSize must be a multiple of a column in sendPicture, got %d", chunkSize))
+	}
+	if totalSize%(144*3) != 0 {
+		panic("totalSize must be a multiple of a column in sendPicture")
+	}
+
+	fullImage := make([]byte, totalSize)
+
+	const on = '\n' - 1
+
+	w := totalSize / 3 / 144
+	for x := 0; x < w; x++ {
+		for y := 0; y < 144; y++ {
+			pos := (x*144 + y) * 3
+			switch (x + y) % 144 {
+			case 0:
+				fullImage[pos] = on
+				fullImage[pos+1] = 0
+				fullImage[pos+2] = 0
+			case 1:
+				fullImage[pos] = 0
+				fullImage[pos+1] = on
+				fullImage[pos+2] = 0
+			case 2:
+				fullImage[pos] = 0
+				fullImage[pos+1] = 0
+				fullImage[pos+2] = on
+			default:
+				fullImage[pos] = 0
+				fullImage[pos+1] = 0
+				fullImage[pos+2] = 0
+			}
+		}
+	}
+
+	start := time.Now()
+
+	it := -1
+	for remain := len(fullImage); remain > 0; remain = len(fullImage) {
+		it++
+		// Send.
+
+		send := chunkSize
+		if remain < send {
+			send = remain
+		}
+		data := make([]byte, send+1)
+		copy(data, fullImage[:send])
+		data[send] = '\n'
+		fullImage = fullImage[send:]
+
+		var crc uint32
+		crc = crc32.Update(crc, crc32.IEEETable, data)
+
+		n, err := s.Write(data)
+		if err != nil {
+			return 0, fmt.Errorf("error iteration %d writing %d bytes: %v", it, len(data), err)
+		}
+		if n != len(data) {
+			return 0, fmt.Errorf("error iteration %d writing %d bytes: wrote only %d bytes", it, len(data), n)
+		}
+
+		// Read.
+		num, err := readUint32(s)
+		if err != nil {
+			return 0, fmt.Errorf("error iteration %d reading number of bytes received: %v", it, err)
+		}
+		got, err := readUint32(s)
+		if err != nil {
+			return 0, fmt.Errorf("error iteration %d reading crc: %v", it, err)
+		}
+
+		// Validate.
+		if num != uint32(len(data)) {
+			return 0, fmt.Errorf("error iteration %d received %d bytes, sent %d bytes", it, num, len(data))
+		}
+		if got != crc {
+			return 0, fmt.Errorf("error iteration %d got CRC %d want %d", it, got, crc)
+		}
+	}
+	return time.Now().Sub(start), nil
 }
 
 func sendTestData(s io.ReadWriter, chunkSize int, totalSize int) (time.Duration, error) {
@@ -99,7 +204,7 @@ func sendTestData(s io.ReadWriter, chunkSize int, totalSize int) (time.Duration,
 		if size > remain {
 			size = 0
 		}
-		data := nlTerminatedData(size)
+		data := nlTerminatedRandomData(size, it)
 
 		var crc uint32
 		crc = crc32.Update(crc, crc32.IEEETable, data)
@@ -134,7 +239,7 @@ func sendTestData(s io.ReadWriter, chunkSize int, totalSize int) (time.Duration,
 	return time.Now().Sub(start), nil
 }
 
-func nlTerminatedData(size int) []byte {
+func nlTerminatedRandomData(size, _ int) []byte {
 	data := make([]byte, size+1)
 	rand.Read(data)
 	for i, v := range data {
