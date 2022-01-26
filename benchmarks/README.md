@@ -39,7 +39,7 @@ Tennsy 4.
 
 NOTE: in this kind of tests we cannot measure the time on arduino
 because `millis()` is not incremented when interrupts are disabled
-[ref](https://forum.arduino.cc/t/does-nointerrupts-disable-the-millisecond-timer/433292/9).
+([ref](https://forum.arduino.cc/t/does-nointerrupts-disable-the-millisecond-timer/433292/9)).
 
 It is still interesting to measure it because it gives us an
 estimation of how much time is spent in not sending data, which should
@@ -266,6 +266,7 @@ Specifically, using WS2812Serial to send a 144x144px image in multiple
 columns we get these results.
 
 | # of cols | time (s) |
+|----------:|---------:|
 |         1 |     6.14 |
 |         2 |     4.08 |
 |         3 |     2.97 |
