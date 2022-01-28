@@ -295,3 +295,28 @@ transmission (6 columns) of the same image takes 3s.
 Meaning that the bottleneck is still the Bluetooth. Therefore with a
 reasonably big buffer, and some appropriate delays between columns, we
 should be able to send and render the image in parallel.
+
+# Android
+
+Hacking the Android app to generate a 144x144 image like the `serialwrite`, 
+the best I can get is 7.30s, which is 1 second more than from the computer.
+So I guess my expectation that the phone could handle bluetooth better
+were wrong.
+I also see a pretty big variance between different runs, I witnessed 1
+second delays for no apparent reason.
+
+More in detail:
+ - Updating the progress bar doesn't waste any performance;
+ - The `sleep(0)` to receive interrupts doesn't waste any time;
+ - Also processing the bitmat doesn't seem to incur in any extra overhead;
+
+But logging is terrybly slow. A single log line for each column adds a
+good extra second on sending the image!
+
+Also, restoring the original app (with the current protocol) has
+similar performance once the logging instruction is removed.
+
+At this point, there is no reason in try micro optimizations.
+The only way to improve significantly the performance is to re-design
+the protocol to allow sending more data in single writes, which likely
+requires using the WS2812Serial library to save time on writing the LEDs.

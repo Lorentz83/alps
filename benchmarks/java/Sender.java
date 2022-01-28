@@ -211,13 +211,18 @@ class internalSender extends Thread {
         do {
             int x = 0;
 
+            long prev = System.currentTimeMillis();
             for (int []col: cols) {
-                _p.writeColumn(col, brightness);
+                _p.writeColumn(col, brightness, x);
                 sleep(delay); // isInterrupted is checked already here.
 
                 // TODO: send the progress less frequently to save (very little) resources.
                 _callbacks.progress(Math.round((float) (x + 1) / w * 100));
                 x++;
+
+                // long now = System.currentTimeMillis();
+                // log.i("Time to preprocess: %dms", now - prev);// THIS IS SLOWWWW!
+                // prev= now;
             }
         } while (loop);
         _p.off(); // Turn the stick off once we are done.
