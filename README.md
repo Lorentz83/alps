@@ -153,5 +153,5 @@ Most of the connections around the 74AHCT125 are required only because
 "all unused inputs of the device must be held at VCC or GND to ensure
 proper device operation"[^2].
 
-[^1] https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels
-[^2] https://www.ti.com/lit/ds/symlink/sn74ahct125.pdf
+[^1]: https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels
+[^2]: https://www.ti.com/lit/ds/symlink/sn74ahct125.pdf
