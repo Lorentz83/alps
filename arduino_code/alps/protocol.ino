@@ -115,8 +115,8 @@ class Protocol {
 
     [[nodiscard]] Status ack() {
       buf[0] = 'o';
+      
       uint32_t v = crc.finalize();
-      debug("crc %d %x", v, v);
       buf[1] = v & 0xFF;
       v >>= 8;
       buf[2] = v & 0xFF;
@@ -124,16 +124,13 @@ class Protocol {
       buf[3] = v & 0xFF;
       v >>= 8;
       buf[4] = v & 0xFF;
-
-      debug("crc %x %x %x %x", buf[1], buf[2], buf[3], buf[4]);
-
+      
       io.write(buf, 5);
-
       return Status{};
     }
 
     size_t waitAndCRCBytes(byte *buf, size_t len) {
-      auto r = io.readBytes(buf, len);
+      size_t r = io.readBytes(buf, len);
       crc.update(buf, r);
       return r;
     }
@@ -185,7 +182,7 @@ class Protocol {
     // handleColumn reads and writes columns, depeding on what's available now.
     Status handleColumn() {
 
-      // Can I read?
+      // Do I have data in the stream to read and buffer to put it into?
       if ( numCols > 0 && colBuf.canWrite() ) {
         byte* buf = colBuf.writeBuffer();
         // For now let's read it in full. I'm not sure that reading it in pieces can increase performances.
@@ -199,24 +196,28 @@ class Protocol {
         colBuf.advanceColumn();
       }
 
-      // Can I write?
+      // Do I have data in the buffer to show on the stick?
       if ( !callbacks->busy() && colBuf.canRead() ) { // TODO use delayBetweenCols.
+        
         byte* buf = colBuf.readNextColumn();
         for ( int n = 0 ; n < pxPerCol ; n++ ) {
-          byte r = *(buf++);
-          byte g = *(buf++);
-          byte b = *(buf++);
+          byte r = *buf;
+          buf++;
+          byte g = *buf;
+          buf++;
+          byte b = *buf;
+          buf++;
           callbacks->setPixelColor(n, r, g, b);
         }
-        for ( int n = pxPerCol ; n < maxPixels ; n++ ) {
-          callbacks->setPixelColor(n, 0, 0, 0); // The rest is black.
-        }
+        // We assume that the last image called off correctly, hence the rest of pixels should be already black.
         callbacks->show();
       }
 
       // If nothing left to read and all the columns has been read.
       if ( numCols == 0 && !colBuf.canRead() ) {
         if ( lastBatchOfCols ) {
+          // TODO add delay before turning off.
+          callbacks->off();
           currentMessage = noCommand;
         }
         return ack();

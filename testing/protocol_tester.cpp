@@ -23,12 +23,14 @@
 #include <iostream>
 #include <mutex>
 #include <queue>
+#include <stdarg.h>
 #include <string>
 #include <thread>
 #include <zlib.h>
-#include <stdarg.h>
 
-using namespace std::chrono_literals;
+// Command line flags.
+bool debug_to_stderr = false;
+bool pixels_to_stderr = false;
 
 using byte = char;
 using String = std::string;
@@ -153,13 +155,13 @@ public:
   }
 
   void write(char c) {
-      *out << c;
-      out->flush();
+    *out << c;
+    out->flush();
   }
 
   void write(const char *buf, int size) {
-      out->write(buf, size);
-      out->flush();
+    out->write(buf, size);
+    out->flush();
   }
 
   void println(const char *str) { *out << str << '\n'; }
@@ -171,7 +173,8 @@ public:
 
   int readBytes(byte *buf, int len) {
     // The default timeout in arduino is 1000 milliseconds.
-      return in->readBytes(buf, len, 1000ms);
+    using namespace std::chrono_literals;
+    return in->readBytes(buf, len, 1000ms);
   }
 };
 
@@ -203,15 +206,33 @@ struct LedControl {
 
   void init() {}
 
-  void show() {}
+  void show() {
+    if (!pixels_to_stderr)
+      return;
 
-  void off() {}
+    std::cerr << "SHOW";
+  }
 
-  bool isButtonPressed() { return false; }
+  void off() {
+    if (!pixels_to_stderr)
+      return;
 
-  void setPixelColor(int pos, byte r, byte g, byte b) {}
+    std::cerr << "OFF";
+  }
 
-  void flashError() {}
+  void setPixelColor(int pos, byte r, byte g, byte b) {
+    if (!pixels_to_stderr)
+      return;
+    std::cerr.put(r);
+    std::cerr.put(g);
+    std::cerr.put(b);
+  }
+
+  void flashError() {
+    if (!pixels_to_stderr)
+      return;
+    std::cerr << "FLASH_ERROR";
+  }
 
   void flashInit() {}
 
@@ -220,29 +241,40 @@ struct LedControl {
   bool busy() { return false; }
 };
 
-void debug(const char* msg, ...) {
+void debug(const char *msg, ...) {
+  if (!debug_to_stderr)
+    return;
+
   static const size_t debugBufLen = 40;
   static char debugbuf[debugBufLen];
 
   va_list ap;
-  va_start( ap, msg );
+  va_start(ap, msg);
   vsnprintf(debugbuf, debugBufLen, msg, ap);
   va_end(ap);
 
-  //  std::cerr << "DBG: " << debugbuf << std::endl;
+  std::cerr << debugbuf << std::endl;
 }
-
 
 #include "../arduino_code/alps/protocol.ino"
 
 using namespace std;
 
 int main(int argc, char *argv[]) {
+
+  for (int i = 1; i < argc; i++) {
+    if ( string("--debug_to_stderr") == argv[i] ) {
+      debug_to_stderr = true;
+    }
+    if ( string("--pixels_to_stderr") == argv[i] ) {
+      pixels_to_stderr = true;
+    }
+  }
+
   LedControl lc;
   Stream io(&std::cin, &std::cout);
-  Stream debug(&std::cerr);
 
-  Protocol<144,1> protocol(&lc, io);
+  Protocol<144, 1> protocol(&lc, io);
   while (true) {
     protocol.checkChannel();
   }

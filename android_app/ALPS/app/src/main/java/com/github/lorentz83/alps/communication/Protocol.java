@@ -86,7 +86,14 @@ public class Protocol {
         _in = in;
         _out = out;
 
-        info();
+        try {
+            info();
+        } catch (IOException e) {
+            // In case of protocol negotiation error, reset the streams.
+            _in = new NoInputStream();
+            _out = new NoOutputStream();
+            throw e;
+        }
     }
 
     private void info() throws IOException {
@@ -100,8 +107,8 @@ public class Protocol {
         }
         // _buf[1] we don't support any extension
         // _buf[2] is unused
-        _maxPixels = _buf[3];
-        _maxCols = _buf[4];
+        _maxPixels = _buf[3] & 0xFF; // Otherwise it considers buf as a signed byte.
+        _maxCols = _buf[4] & 0xFF;
         int requiredLen = _maxCols + _maxPixels * 3 +10; // extra space for headers.
         if ( _buf.length < requiredLen) {
             _buf = new byte[requiredLen];
@@ -184,47 +191,51 @@ public class Protocol {
      *
      * @param w the width of the image.
      * @param h the height of the image.
-     * @param pixels the color of the pixels, ordered in columns.
+     * @param pixels the color of the pixels in ARGB format, ordered in columns.
+     * @param brightness between 0 and 1.
      * @param callback if non null, this predicate is called with the number of the last column sent.
      * @throws IOException in case of error.
      */
-    public void showImage(int w, int h, int[] pixels, int sleep, IntConsumer callback) throws IOException, InterruptedException {
-        if ( h > 255 ) { // TODO we should check the pixel length here.
-            throw new ProtocolException("uploaded images cannot be higher than 255 pixels");
+    public void showImage(int w, int h, int[] pixels, float brightness, int sleep, IntConsumer callback) throws IOException, InterruptedException {
+        if ( h > _maxPixels ) { // TODO we should check the pixel length here.
+            throw new ProtocolException("the stick has only " + _maxPixels + " pixels");
         }
         if (pixels.length != w*h) {
             throw new IllegalArgumentException("number of pixels doesn't match the image size");
         }
 
-        byte wHi = (byte)((w >>> 8) & 0xff);
-        byte wLow =  (byte)(w & 0xff);
-
-        _buf[0] = NEW_IMAGE;
-        _buf[1] = (byte) h;
-        _buf[2] = 0; // TODO add delay here.
-        _buf[3] = 1; // TODO use the max num of cols we can send.
-        sendOnly(_buf, 4);
-
-
-        int i = 0;
-        int col = 0;
+        int idx = 0;
+        int col = Math.min(_maxCols, w);
         PixelColor c = new PixelColor();
-        for (int rawColor : pixels) {
-            c.setColor(rawColor);
-            _buf[i++] = c.getRed();
-            _buf[i++] = c.getGreen();
-            _buf[i++] = c.getBlue();
 
-            if ( (i / 3) % h == 0 ) {
-                col++;
-                sendAndWaitForAck(_buf, i);
-                i = 0;
-                if (callback != null) {
-                    callback.accept(col);
-                }
+        _buf[idx++] = NEW_IMAGE;
+        _buf[idx++] = (byte) h;
+        _buf[idx++] = (byte) sleep; // TODO define the unit.
+        _buf[idx++] = (byte) _maxCols;
+
+        for ( int x = 0 ; x < w ; x++) {
+            for ( int y = 0 ; y < h ; y++) {
+                c.setColor(pixels[x*h+y], brightness);
+                _buf[idx++] = c.getRed();
+                _buf[idx++] = c.getGreen();
+                _buf[idx++] = c.getBlue();
+            }
+            if ( --col == 0 ) {
+                // Send the data.
+                sendAndWaitForAck(_buf, idx);
+                // Reset counters.
+                idx = 0;
+                int colsRemaining = w - x - 1; // We just sent the col "x".
+                col = Math.min(_maxCols, colsRemaining);
+                // Prepare new message. NOTE: it may be useless because we just sent the last col, but who cares.
+                _buf[idx++] = CONTINUE_IMAGE;
+                _buf[idx++] = (byte) ((col == colsRemaining) ? 1 : 0); // lastBatchOfCols
+                _buf[idx++] = (byte) col; // Num cols to send.
+            }
+            if (callback != null) {
+                callback.accept((int)(x/(double)w*100));
             }
         }
-        log.i("upload completed");
     }
 
     /**

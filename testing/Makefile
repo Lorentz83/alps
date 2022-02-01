@@ -9,6 +9,9 @@ protocol_tester: protocol_tester.cpp CRC32.h ../arduino_code/alps/protocol.ino
 clean:
 	rm -f protocol_tester
 
+format:
+	lang-format -i protocol_tester.cpp
+
 validate:
 	$(arduino_dir)/arduino-builder -compile -fqbn $(arduino_board) \
 		-hardware $(arduino_dir)/hardware \

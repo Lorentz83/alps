@@ -206,9 +206,8 @@ class internalSender extends Thread {
         int []pixels = new int[w*h];
         bmp.getPixels(pixels, 0, h, 0, 0, h, w); // h and w are flipped because we rotated 90 deg.
 
-        // TODO we need to forward brightness!
         do {
-            _p.showImage(w, h, pixels, delay, (int col) -> _callbacks.progress(Math.round((float) col / w * 100)));
+            _p.showImage(w, h, pixels, brightness, delay, (int col) -> _callbacks.progress(Math.round((float) col / w * 100)));
         } while (loop);
     }
 
