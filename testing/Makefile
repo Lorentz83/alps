@@ -3,8 +3,8 @@ arduino_board=arduino:avr:mega
 
 all: protocol_tester
 
-protocol_tester: protocol_tester.cpp ../arduino_code/alps/protocol.ino
-	g++ -g  -std=c++20  -pthread -o $@ $<
+protocol_tester: protocol_tester.cpp CRC32.h ../arduino_code/alps/protocol.ino
+	g++ -g -I . -std=c++20 -pthread -o $@ $< -lz
 
 clean:
 	rm -f protocol_tester

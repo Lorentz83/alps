@@ -202,25 +202,14 @@ class internalSender extends Thread {
         Matrix matrix = new Matrix();
         matrix.postScale(1, -1, w/2f, h/2f);
         bmp = Bitmap.createBitmap(bmp, 0, 0, w, h, matrix, true);
-        
-        int [][]cols = new int[w][h];
-        for (int x = 0; x < w; x++) {
-            bmp.getPixels(cols[x], 0, 1, x, 0, 1, h);
-        }
 
+        int []pixels = new int[w*h];
+        bmp.getPixels(pixels, 0, h, 0, 0, h, w); // h and w are flipped because we rotated 90 deg.
+
+        // TODO we need to forward brightness!
         do {
-            int x = 0;
-
-            for (int []col: cols) {
-                _p.writeColumn(col, brightness);
-                sleep(delay); // isInterrupted is checked already here.
-
-                // TODO: send the progress less frequently to save (very little) resources.
-                _callbacks.progress(Math.round((float) (x + 1) / w * 100));
-                x++;
-            }
+            _p.showImage(w, h, pixels, delay, (int col) -> _callbacks.progress(Math.round((float) col / w * 100)));
         } while (loop);
-        _p.off(); // Turn the stick off once we are done.
     }
 
     // To avoid synchronization problems, this function is static and cannot access any field.

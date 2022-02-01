@@ -31,6 +31,26 @@ class Protocol_IntegrationTest {
     }
 
     @Timeout(value = 2, unit = SECONDS)
+    //@Test
+    @RepeatedTest(30)
+    void off() throws IOException, InterruptedException {
+        Process testing = new ProcessBuilder("./protocol_tester")
+                .directory(new File(testingDir))
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start();
+        try {
+            Protocol p = new Protocol();
+            p.initializeConnection(testing.getInputStream(), testing.getOutputStream());
+
+            p.off();
+        } finally {
+            testing.destroy();
+        }
+    }
+
+
+/*
+    @Timeout(value = 2, unit = SECONDS)
     @RepeatedTest(30)
     void writeColumn() throws IOException, InterruptedException {
         Process testing = new ProcessBuilder("./protocol_tester")
@@ -108,6 +128,7 @@ class Protocol_IntegrationTest {
             testing.destroy();
         }
     }
+    */
 }
 
 

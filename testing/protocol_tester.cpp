@@ -25,10 +25,12 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <zlib.h>
+#include <stdarg.h>
 
 using namespace std::chrono_literals;
 
-using byte = unsigned char;
+using byte = char;
 using String = std::string;
 
 enum PrintFormat { BIN, OCT, DEC, HEX };
@@ -150,9 +152,15 @@ public:
     *out << n << std::dec;
   }
 
-  void write(char c) { *out << c; }
+  void write(char c) {
+      *out << c;
+      out->flush();
+  }
 
-  void write(char *buf, int size) { out->write(buf, size); }
+  void write(const char *buf, int size) {
+      out->write(buf, size);
+      out->flush();
+  }
 
   void println(const char *str) { *out << str << '\n'; }
 
@@ -208,7 +216,22 @@ struct LedControl {
   void flashInit() {}
 
   uint16_t numPixels() const { return 144; }
+
+  bool busy() { return false; }
 };
+
+void debug(const char* msg, ...) {
+  static const size_t debugBufLen = 40;
+  static char debugbuf[debugBufLen];
+
+  va_list ap;
+  va_start( ap, msg );
+  vsnprintf(debugbuf, debugBufLen, msg, ap);
+  va_end(ap);
+
+  //  std::cerr << "DBG: " << debugbuf << std::endl;
+}
+
 
 #include "../arduino_code/alps/protocol.ino"
 
@@ -219,7 +242,7 @@ int main(int argc, char *argv[]) {
   Stream io(&std::cin, &std::cout);
   Stream debug(&std::cerr);
 
-  Protocol protocol(&lc, &io, &debug);
+  Protocol<144,1> protocol(&lc, io);
   while (true) {
     protocol.checkChannel();
   }

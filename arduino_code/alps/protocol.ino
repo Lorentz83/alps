@@ -17,139 +17,282 @@
     along with ALPS.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
-#include <stdarg.h>
+#include <CRC32.h>
 
 // Status is used together the [[nodiscard]] attribute to generate warnings when an error is ignored.
 class Status {};
 
+template<int maxPixels, int maxCols>
+class ColumnBuffer {
+    byte buf[maxCols][maxPixels];
+    size_t currWCol;
+    size_t currRCol;
+    bool isEmpty;
+
+  public:
+    ColumnBuffer() {
+      reset();
+    }
+
+    void reset() {
+      currWCol = 0;
+      currRCol = 0;
+      isEmpty = true;
+    }
+
+    bool canWrite() {
+      return isEmpty || currWCol != currRCol;
+    }
+
+    bool canRead() {
+      return !isEmpty;
+    }
+
+    byte* readNextColumn() {
+      byte* r = buf[currRCol];
+      currRCol = ( currRCol + 1 ) % maxCols;
+      isEmpty = currRCol == currWCol;
+      return r;
+    }
+
+    byte* writeBuffer() {
+      return buf[currWCol];
+    }
+
+    void advanceColumn() {
+      currWCol = ( currWCol + 1 ) % maxCols;
+      isEmpty = false;
+    }
+};
+
+template<int maxPixels, int maxCols>
 class Protocol {
 
     enum message {
+      noCommand = 0, // Never sent on the wire, just represents we are currently handling nothing.
+      info = '?',
       off   = 'o',
-      column = 'c',
-      ready = 'r',
-      //
-      upload = 'u',
-      reshow = 'w',
-      settings = 's',
+      newImage = 'n',
+      continueImage = 'c',
     };
 
+    CRC32 crc;
+
     LedControl *callbacks;
-    Stream *io;
-    Stream *ds;
+    Stream &io;
 
-    const unsigned int maxPixels;
-    const size_t blen;
-    byte *buf;
+    // Buffers.
+    static const int blen = 5; // This is the maximum size of a header.
+    byte buf[blen];
+    ColumnBuffer<maxPixels, maxCols> colBuf;
 
-    static const int olen = 5;
-    char obuf[olen + 1]; // for the \0 in snprint
+    // Protocol related
+    byte currentMessage = noCommand;
 
-    // settings
-    unsigned long sDelay = 0;
-    uint8_t sBrightness = 0;
-    byte sLoop = 0;
+    byte pxPerCol = 0;
+    byte delayBetweenCols = 0;
+    byte numCols = 0;
+    bool lastBatchOfCols = false;
 
-    [[nodiscard]] Status errorf(int line, String msg);
-    void debugf(int line, const char* msg, ...);
-    [[nodiscard]] Status ackf(int line);
 
-    int readByte();
+    [[nodiscard]] Status error(const char code[4]) { // TODO it would be nice to validate the size at compile time
+      buf[0] = 'k';
+      for ( int i = 0 ; i < 4 ; i++ ) {
+        buf[i + 1] = code [i];
+      }
+      io.write(buf, 5);
 
-    Status handleOff();
-    Status handleReady();
-    Status handleColumn();
-    Status handleUpload();
-    Status handleReshow();
-    Status handleSettings();
+      // flush input
+      int b = io.available();
+      while (b-- > 0)
+        io.read();
+
+      // reset processing message.
+      currentMessage = noCommand;
+
+      return Status{};
+    }
+
+    [[nodiscard]] Status ack() {
+      buf[0] = 'o';
+      uint32_t v = crc.finalize();
+      debug("crc %d %x", v, v);
+      buf[1] = v & 0xFF;
+      v >>= 8;
+      buf[2] = v & 0xFF;
+      v >>= 8;
+      buf[3] = v & 0xFF;
+      v >>= 8;
+      buf[4] = v & 0xFF;
+
+      debug("crc %x %x %x %x", buf[1], buf[2], buf[3], buf[4]);
+
+      io.write(buf, 5);
+
+      return Status{};
+    }
+
+    size_t waitAndCRCBytes(byte *buf, size_t len) {
+      auto r = io.readBytes(buf, len);
+      crc.update(buf, r);
+      return r;
+    }
+
+    Status handleInfo() {
+      buf[0] = '!';
+      buf[1] = 0; // no exteneions.
+      buf[2] = 0; // not used.
+      buf[3] = maxPixels;
+      buf[4] = maxCols;
+
+      io.write(buf, 5);
+      return Status{};
+    }
+
+    Status handleOff() {
+      if ( waitAndCRCBytes(buf, 4) != 4 ) {
+        return error("noof");
+      }
+      callbacks->off();
+      currentMessage = noCommand;
+      return ack();
+    }
+
+    Status handleNewImage() {
+      if ( waitAndCRCBytes(buf, 3) != 3 ) {
+        return error("nada");
+      }
+
+      pxPerCol = buf[0];
+      delayBetweenCols = buf[1];
+      numCols = buf[2];
+      lastBatchOfCols = false;
+
+      return handleColumn();
+    }
+
+    Status handleContinueImage() {
+      if ( waitAndCRCBytes(buf, 2) != 2 ) {
+        return error("noci");
+      }
+
+      lastBatchOfCols = buf[0];
+      numCols = buf[1];
+
+      return handleColumn();
+    }
+
+    // handleColumn reads and writes columns, depeding on what's available now.
+    Status handleColumn() {
+
+      // Can I read?
+      if ( numCols > 0 && colBuf.canWrite() ) {
+        byte* buf = colBuf.writeBuffer();
+        // For now let's read it in full. I'm not sure that reading it in pieces can increase performances.
+        size_t want = pxPerCol * 3;
+        if ( waitAndCRCBytes(buf, want) != want ) {
+          numCols = 0;
+          colBuf.reset();
+          return error("noco");
+        }
+        numCols--;
+        colBuf.advanceColumn();
+      }
+
+      // Can I write?
+      if ( !callbacks->busy() && colBuf.canRead() ) { // TODO use delayBetweenCols.
+        byte* buf = colBuf.readNextColumn();
+        for ( int n = 0 ; n < pxPerCol ; n++ ) {
+          byte r = *(buf++);
+          byte g = *(buf++);
+          byte b = *(buf++);
+          callbacks->setPixelColor(n, r, g, b);
+        }
+        for ( int n = pxPerCol ; n < maxPixels ; n++ ) {
+          callbacks->setPixelColor(n, 0, 0, 0); // The rest is black.
+        }
+        callbacks->show();
+      }
+
+      // If nothing left to read and all the columns has been read.
+      if ( numCols == 0 && !colBuf.canRead() ) {
+        if ( lastBatchOfCols ) {
+          currentMessage = noCommand;
+        }
+        return ack();
+      }
+      // Otherwise let's wait the next cycle.
+      return Status{};
+    }
 
   public:
-    Protocol(LedControl *callbacks, Stream* io, Stream* debug);
-    ~Protocol();
-    void checkChannel();
-    int doReshow();
+
+    Protocol(LedControl *callbacks, Stream& io): callbacks(callbacks), io(io), colBuf() {
+      // NOTE: here streams are not initialized yet.
+      // TODO it would be nice to validate maxPixels here compared to callbacks.
+
+      static_assert(maxPixels > 0, "maxPixels must be positive");
+      static_assert(maxPixels < 255, "maxPixels must fit in a byte");
+      static_assert(maxCols > 0, "maxCols must be positive");
+      static_assert(maxCols < 255, "maxCols must fit in a byte");
+    }
+
+    void checkChannel() {
+
+      if ( currentMessage == noCommand ) { // We are waiting for something do do.
+        if ( io.available() == 0 ) {
+          return; // nothing to do.
+        }
+        int b = io.read();
+        
+        crc.reset();
+        crc.update(b);
+
+        debug("command %c", b);
+        switch (b) {
+          case off:
+            handleOff();
+            break;
+          case info:
+            handleInfo();
+            break;
+          case newImage:
+            handleNewImage();
+            break;
+          case continueImage:
+            handleContinueImage();
+            break;
+          default:
+            (void) error("cmdE"); // Ignore [[nodiscard]]
+        }
+      } else { // Let's check if we were doing something.
+        switch (currentMessage) {
+          case noCommand:
+            return; // Nothing to do.
+          case newImage:
+          // fallthrough;
+          case continueImage:
+            handleColumn();
+            break;
+          default:
+            (void) error("cntE"); // Ignore [[nodiscard]]
+        }
+      }
+    };
 };
 
-void Protocol::debugf(int line, const char* msg, ...) {
-  static const size_t debugBufLen = 40;
-  static char debugbuf[debugBufLen];
-
-  if (!ds) {
-    return;
-  }
-
-  va_list ap;
-  va_start( ap, msg );
-  vsnprintf(debugbuf, debugBufLen, msg, ap);
-  va_end(ap);
-
-  ds->print(line, DEC);
-  ds->write(' ');
-  ds->println(debugbuf);
-}
-
-Status Protocol::errorf(int line, String msg) {
-  snprintf(obuf, olen + 1, "k%04d", line);
-  io->write(obuf, olen);
-
-  debugf(line, "%s", msg.c_str());
-
-  // flush input
-  int b = io->available();
-  while (b-- > 0)
-    io->read();
-  return Status{};
-}
-
-Status Protocol::ackf(int line) {
-  snprintf(obuf, olen + 1, "o%04d", line);
-  io->write(obuf, olen);
-  return Status{};
-}
 
 
-#define debug(...) debugf(__LINE__, __VA_ARGS__)
-#define error(msg) errorf(__LINE__, msg)
-#define ack() ackf(__LINE__)
-
-Protocol::Protocol(LedControl *callbacks, Stream* io, Stream* ds): callbacks(callbacks), io(io), ds(ds), maxPixels(callbacks->numPixels()), blen(maxPixels * 3) {
-  // NOTE: here streams are not initialized yet.
-
-  buf = (byte*) malloc( sizeof(*buf) * blen );
-}
-
-Protocol::~Protocol() {
-  free(buf);
-}
-
-int Protocol::readByte() {
+/*
+  int Protocol::readByte() {
   int r = io->readBytes(buf, 1);
   if (r != 1)
     return -1;
   return buf[0];
-}
-
-Status Protocol::handleReady() {
-  if (readByte() != 2) {
-    return error("unexpected ready message");
   }
-  if (callbacks->isButtonPressed()) {
-    return error("not ready");
-  } else {
-    return ack();
-  }
-}
 
-Status Protocol::handleOff() {
-  if (readByte() != 2) {
-    return error("unexpected off message");
-  }
-  callbacks->off();
-  return ack();
-}
 
-Status Protocol::handleColumn() {
+  Status Protocol::handleColumn() {
   int pixels = readByte();
 
   if ( (unsigned int)pixels > maxPixels ) {
@@ -166,139 +309,10 @@ Status Protocol::handleColumn() {
   }
   callbacks->show();
   return ack();
-}
-
-Status Protocol::handleUpload() {
-  File myFile = SD.open("ledcode.txt", O_READ | O_WRITE | O_CREAT | O_TRUNC);
-  if (!myFile) {
-    return error("cannot open file");
   }
 
-  size_t r = io->readBytes(buf, 3);
-  if ( r != 3 ) {
-    return error("wrong upload header");
-  }
 
-  byte h = buf[0];
-  if ( h > maxPixels ) {
-    return error("image too high");
-  }
-
-  unsigned int w = ( ((unsigned int)buf[1]) << 8) + buf[2];
-
-  if ( myFile.write(buf, 3) != 3 ) {
-    return error("cannot write file");
-  }
-
-  (void) ack(); // Ignore [[nodiscard]]
-
-  size_t toRead = h * 3;
-
-  for ( byte x = 0 ; x < w ; x++ ) {
-    r = io->readBytes(buf, toRead);
-    if (r != toRead) {
-      debug("incomplete col %d read %d bytes", x, r);
-      return error("incomplete pixel");
-    }
-    if ( myFile.write(buf, toRead) != toRead) {
-      return error("cannot write file");
-    }
-
-    myFile.flush();
-    debug("up ack %d col", x);
-    (void) ack(); // Ignore [[nodiscard]]
-  }
-
-  return Status{};
-}
-
-Status Protocol::handleReshow() {
-  if ( !doReshow() ) {
-    return error("error reading file");
-  } else {
-    return ack();
-  }
-}
-
-Status Protocol::handleSettings() {
-  size_t r = io->readBytes(buf, 3);
-  if ( r != 3 ) {
-    return error("cannot read settings");
-  }
-
-  sDelay = buf[0] * 10;
-  sBrightness = buf[1] + 1;
-  sLoop = buf[2];
-
-  return ack();
-}
-
-class FileCloser {
-    File &f;
-  public:
-    FileCloser(File &f) : f(f) {}
-    ~FileCloser() {
-      f.close();
-    }
-};
-
-// This function can be triggered from a button, so it shouldn't be part of the communication protocol.
-int Protocol::doReshow() {
-  File myFile = SD.open("ledcode.txt");
-  if (!myFile) {
-    debug("cannot open file");
-    callbacks->flashError();
-    return 0;
-  }
-  FileCloser fc(myFile);
-
-  unsigned int h = myFile.read();
-  unsigned int wHi = myFile.read();
-  unsigned int wLow = myFile.read();
-  unsigned int w = (wHi << 8) + wLow;
-
-  do {
-    myFile.seek(3);
-    for ( unsigned int x = 0 ; x < w ; x++ ) {
-      if (callbacks->isButtonPressed()) {
-        goto exitLoop;
-      }
-      for ( unsigned int y = 0 ; y < h ; y++ ) {
-        int r = myFile.readBytes(buf, 3);
-        if (r != 3) {
-          debug("incomplete file %dx%d: %d", x, y, r);
-          myFile.close();
-          callbacks->flashError();
-          return 0;
-        }
-
-        uint8_t rr = buf[0];
-        uint8_t gg = buf[1];
-        uint8_t bb = buf[2];
-
-        if ( sBrightness ) {
-          rr = (rr * sBrightness) >> 8;
-          gg = (gg * sBrightness) >> 8;
-          bb = (bb * sBrightness) >> 8;
-        }
-
-        callbacks->setPixelColor(y, rr, gg, bb);
-      }
-      callbacks->show();
-
-      delay(sDelay);
-    }
-  } while ( sLoop );
-
-exitLoop:
-
-  myFile.close();
-  callbacks->off();
-
-  return 1;
-}
-
-void Protocol::checkChannel() {
+  void Protocol::checkChannel() {
   static int last = -2;
 
   int b = io->read();
@@ -307,23 +321,11 @@ void Protocol::checkChannel() {
     last = b;
   }
   switch (b) {
-    case ready:
-      handleReady();
-      break;
     case off:
       handleOff();
       break;
     case column:
       handleColumn();
-      break;
-    case upload:
-      handleUpload();
-      break;
-    case reshow:
-      handleReshow();
-      break;
-    case settings:
-      handleSettings();
       break;
     case -1:
       // nothing to read.
@@ -331,8 +333,5 @@ void Protocol::checkChannel() {
     default:
       (void) error("unexpected message"); // Ignore [[nodiscard]]
   }
-}
-
-#undef error
-#undef ack
-#undef debug
+  }
+*/
