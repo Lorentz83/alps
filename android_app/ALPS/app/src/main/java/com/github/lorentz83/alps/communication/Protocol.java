@@ -47,7 +47,7 @@ public class Protocol {
     private final byte NEW_IMAGE = 'n';
     private final byte CONTINUE_IMAGE = 'c';
 
-    CRC32 _crc = new CRC32();
+    private CRC32 _crc = new CRC32();
     private byte[] _buf = new byte[255*3+2];
 
     private int _maxPixels = 144;
@@ -109,7 +109,8 @@ public class Protocol {
         // _buf[2] is unused
         _maxPixels = _buf[3] & 0xFF; // Otherwise it considers buf as a signed byte.
         _maxCols = _buf[4] & 0xFF;
-        int requiredLen = _maxCols + _maxPixels * 3 +10; // extra space for headers.
+        int requiredLen = _maxCols * _maxPixels * 3 + 10; // extra space for headers.
+
         if ( _buf.length < requiredLen) {
             _buf = new byte[requiredLen];
         }
@@ -203,7 +204,6 @@ public class Protocol {
         if (pixels.length != w*h) {
             throw new IllegalArgumentException("number of pixels doesn't match the image size");
         }
-
         int idx = 0;
         int col = Math.min(_maxCols, w);
         PixelColor c = new PixelColor();
@@ -211,7 +211,7 @@ public class Protocol {
         _buf[idx++] = NEW_IMAGE;
         _buf[idx++] = (byte) h;
         _buf[idx++] = (byte) sleep; // TODO define the unit.
-        _buf[idx++] = (byte) _maxCols;
+        _buf[idx++] = (byte) col;
 
         for ( int x = 0 ; x < w ; x++) {
             for ( int y = 0 ; y < h ; y++) {
@@ -227,7 +227,10 @@ public class Protocol {
                 idx = 0;
                 int colsRemaining = w - x - 1; // We just sent the col "x".
                 col = Math.min(_maxCols, colsRemaining);
-                // Prepare new message. NOTE: it may be useless because we just sent the last col, but who cares.
+                // Prepare new message.
+                // NOTE: it may be useless because we just sent the last col.
+                // But in case we sent everything with the 1st message we still need to send the
+                // terminator.
                 _buf[idx++] = CONTINUE_IMAGE;
                 _buf[idx++] = (byte) ((col == colsRemaining) ? 1 : 0); // lastBatchOfCols
                 _buf[idx++] = (byte) col; // Num cols to send.
@@ -235,6 +238,9 @@ public class Protocol {
             if (callback != null) {
                 callback.accept((int)(x/(double)w*100));
             }
+        }
+        if (w <= _maxCols) {
+            sendAndWaitForAck(_buf, idx);
         }
     }
 

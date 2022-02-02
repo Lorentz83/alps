@@ -32,7 +32,10 @@
 bool debug_to_stderr = false;
 bool pixels_to_stderr = false;
 
-using byte = char;
+// A byte stores an 8-bit unsigned number, from 0 to 255.
+// https://www.arduino.cc/reference/en/language/variables/data-types/byte/
+using byte = uint8_t;
+
 using String = std::string;
 
 enum PrintFormat { BIN, OCT, DEC, HEX };
@@ -104,7 +107,6 @@ public:
     int read = 0;
     while (1) {
       std::unique_lock<std::mutex> l(data_wait);
-
       int n = readBytes(buf, len);
       read += n;
       buf += n;
@@ -154,13 +156,13 @@ public:
     *out << n << std::dec;
   }
 
-  void write(char c) {
-    *out << c;
+  void write(byte c) {
+    out->put(c);
     out->flush();
   }
 
-  void write(const char *buf, int size) {
-    out->write(buf, size);
+  void write(const byte *buf, int size) {
+    out->write((const char *)buf, size);
     out->flush();
   }
 
@@ -220,7 +222,7 @@ struct LedControl {
     std::cerr << "OFF";
   }
 
-  void setPixelColor(int pos, byte r, byte g, byte b) {
+  void setPixelColor(uint16_t pos, uint8_t r, uint8_t g, uint8_t b) {
     if (!pixels_to_stderr)
       return;
     std::cerr.put(r);
@@ -260,13 +262,17 @@ void debug(const char *msg, ...) {
 
 using namespace std;
 
+#ifndef TESTING_COLS // Allow override from g++ cli.
+#define TESTING_COLS 1
+#endif
+
 int main(int argc, char *argv[]) {
 
   for (int i = 1; i < argc; i++) {
-    if ( string("--debug_to_stderr") == argv[i] ) {
+    if (string("--debug_to_stderr") == argv[i]) {
       debug_to_stderr = true;
     }
-    if ( string("--pixels_to_stderr") == argv[i] ) {
+    if (string("--pixels_to_stderr") == argv[i]) {
       pixels_to_stderr = true;
     }
   }
@@ -274,7 +280,7 @@ int main(int argc, char *argv[]) {
   LedControl lc;
   Stream io(&std::cin, &std::cout);
 
-  Protocol<144, 1> protocol(&lc, io);
+  Protocol<144, TESTING_COLS> protocol(&lc, io);
   while (true) {
     protocol.checkChannel();
   }

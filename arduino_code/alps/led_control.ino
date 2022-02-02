@@ -41,8 +41,8 @@ class LedControl {
       pixels.show();
     }
 
-    void setPixelColor(int pos, byte r, byte g, byte b) {
-      pixels.setPixelColor(pos, pixels.Color(r, g, b));
+    void setPixelColor(uint16_t pos, uint8_t r, uint8_t g, uint8_t b) {
+      pixels.setPixelColor(pos, r, g, b);
     }
 
     void flashError() {

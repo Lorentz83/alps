@@ -1,16 +1,19 @@
 arduino_dir=/opt/arduino
 arduino_board=arduino:avr:mega
 
-all: protocol_tester
+all: tester_1 tester_3
 
-protocol_tester: protocol_tester.cpp CRC32.h ../arduino_code/alps/protocol.ino
-	g++ -g -I . -std=c++20 -pthread -o $@ $< -lz
+tester_1: protocol_tester.cpp CRC32.h ../arduino_code/alps/protocol.ino
+	g++ -DTESTING_COLS=1 -g -I . -std=c++20 -pthread -o $@ $< -lz
+
+tester_3: protocol_tester.cpp CRC32.h ../arduino_code/alps/protocol.ino
+	g++ -DTESTING_COLS=3 -g -I . -std=c++20 -pthread -o $@ $< -lz
 
 clean:
-	rm -f protocol_tester
+	rm -f tester_1 tester_3
 
 format:
-	lang-format -i protocol_tester.cpp
+	clang-format -i protocol_tester.cpp
 
 validate:
 	$(arduino_dir)/arduino-builder -compile -fqbn $(arduino_board) \

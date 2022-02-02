@@ -24,7 +24,7 @@ class Status {};
 
 template<int maxPixels, int maxCols>
 class ColumnBuffer {
-    byte buf[maxCols][maxPixels];
+    byte buf[maxCols][maxPixels*3];
     size_t currWCol;
     size_t currRCol;
     bool isEmpty;
@@ -89,9 +89,9 @@ class Protocol {
     // Protocol related
     byte currentMessage = noCommand;
 
-    byte pxPerCol = 0;
-    byte delayBetweenCols = 0;
-    byte numCols = 0;
+    uint8_t pxPerCol = 0;
+    uint8_t delayBetweenCols = 0;
+    uint8_t numCols = 0;
     bool lastBatchOfCols = false;
 
 
@@ -143,6 +143,7 @@ class Protocol {
       buf[4] = maxCols;
 
       io.write(buf, 5);
+      currentMessage = noCommand;
       return Status{};
     }
 
@@ -181,7 +182,6 @@ class Protocol {
 
     // handleColumn reads and writes columns, depeding on what's available now.
     Status handleColumn() {
-
       // Do I have data in the stream to read and buffer to put it into?
       if ( numCols > 0 && colBuf.canWrite() ) {
         byte* buf = colBuf.writeBuffer();
@@ -198,7 +198,6 @@ class Protocol {
 
       // Do I have data in the buffer to show on the stick?
       if ( !callbacks->busy() && colBuf.canRead() ) { // TODO use delayBetweenCols.
-        
         byte* buf = colBuf.readNextColumn();
         for ( int n = 0 ; n < pxPerCol ; n++ ) {
           byte r = *buf;
@@ -209,17 +208,18 @@ class Protocol {
           buf++;
           callbacks->setPixelColor(n, r, g, b);
         }
+
         // We assume that the last image called off correctly, hence the rest of pixels should be already black.
         callbacks->show();
       }
 
-      // If nothing left to read and all the columns has been read.
+      // If nothing left on the wire and all the columns has been sent to the stick.
       if ( numCols == 0 && !colBuf.canRead() ) {
         if ( lastBatchOfCols ) {
           // TODO add delay before turning off.
           callbacks->off();
-          currentMessage = noCommand;
         }
+        currentMessage = noCommand; // We can wait for the new command.
         return ack();
       }
       // Otherwise let's wait the next cycle.
@@ -244,13 +244,13 @@ class Protocol {
         if ( io.available() == 0 ) {
           return; // nothing to do.
         }
-        int b = io.read();
+        currentMessage = io.read();
         
         crc.reset();
-        crc.update(b);
+        crc.update(currentMessage);
 
-        debug("command %c", b);
-        switch (b) {
+        debug("CMD_%c", currentMessage);
+        switch (currentMessage) {
           case off:
             handleOff();
             break;
@@ -264,6 +264,7 @@ class Protocol {
             handleContinueImage();
             break;
           default:
+            currentMessage = noCommand;
             (void) error("cmdE"); // Ignore [[nodiscard]]
         }
       } else { // Let's check if we were doing something.
@@ -276,6 +277,7 @@ class Protocol {
             handleColumn();
             break;
           default:
+            debug("NO_CONTINUE_%c", currentMessage);
             (void) error("cntE"); // Ignore [[nodiscard]]
         }
       }
