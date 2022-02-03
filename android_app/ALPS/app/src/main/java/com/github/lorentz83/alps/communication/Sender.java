@@ -198,16 +198,19 @@ class internalSender extends Thread {
         int w = bmp.getWidth();
         int h = bmp.getHeight();
 
-        // flip vertically because our origin is on the bottom of the stick.
+        // getPixels returns row by row from the top.
+        // rotating 90 we get the columns.
         Matrix matrix = new Matrix();
-        matrix.postScale(1, -1, w/2f, h/2f);
+        matrix.postRotate(90);
         bmp = Bitmap.createBitmap(bmp, 0, 0, w, h, matrix, true);
 
         int []pixels = new int[w*h];
-        bmp.getPixels(pixels, 0, h, 0, 0, h, w); // h and w are flipped because we rotated 90 deg.
+        bmp.getPixels(pixels, 0, bmp.getWidth(), 0, 0, bmp.getWidth(), bmp.getHeight());
 
         do {
-            _p.showImage(w, h, pixels, brightness, delay, (int col) -> _callbacks.progress(Math.round((float) col / w * 100)));
+            _p.showImage(w, h, pixels, brightness, delay, (int col) -> {
+                _callbacks.progress(Math.round((float) col / w * 100));
+            });
         } while (loop);
     }
 

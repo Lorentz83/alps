@@ -188,17 +188,18 @@ public class Protocol {
     }
 
     /**
-     * Shows the image.
+     * Shows the image on the stick.
      *
      * @param w the width of the image.
      * @param h the height of the image.
      * @param pixels the color of the pixels in ARGB format, ordered in columns.
-     * @param brightness between 0 and 1.
+     * @param brightness between 0 (totally off) and 1 (full brightness).
      * @param callback if non null, this predicate is called with the number of the last column sent.
      * @throws IOException in case of error.
+     * @throws IllegalArgumentException if the number of pixels is not aligned with the image size.
      */
     public void showImage(int w, int h, int[] pixels, float brightness, int sleep, IntConsumer callback) throws IOException, InterruptedException {
-        if ( h > _maxPixels ) { // TODO we should check the pixel length here.
+        if ( h > _maxPixels ) {
             throw new ProtocolException("the stick has only " + _maxPixels + " pixels");
         }
         if (pixels.length != w*h) {
@@ -222,6 +223,7 @@ public class Protocol {
             }
             if ( --col == 0 ) {
                 // Send the data.
+                Thread.sleep(0); // To support InterruptedException. No need to reset here, the caller does it.
                 sendAndWaitForAck(_buf, idx);
                 // Reset counters.
                 idx = 0;
@@ -236,7 +238,7 @@ public class Protocol {
                 _buf[idx++] = (byte) col; // Num cols to send.
             }
             if (callback != null) {
-                callback.accept((int)(x/(double)w*100));
+                callback.accept(x+1);
             }
         }
         if (w <= _maxCols) {
