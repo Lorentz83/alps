@@ -78,7 +78,7 @@ class Protocol {
 
     CRC32 crc;
 
-    LedControl *callbacks;
+    LedControl<maxPixels> *callbacks;
     Stream &io;
 
     // Buffers.
@@ -228,9 +228,8 @@ class Protocol {
 
   public:
 
-    Protocol(LedControl *callbacks, Stream& io): callbacks(callbacks), io(io), colBuf() {
+    Protocol(LedControl<maxPixels> *callbacks, Stream& io): callbacks(callbacks), io(io), colBuf() {
       // NOTE: here streams are not initialized yet.
-      // TODO it would be nice to validate maxPixels here compared to callbacks.
 
       static_assert(maxPixels > 0, "maxPixels must be positive");
       static_assert(maxPixels < 255, "maxPixels must fit in a byte");
@@ -283,58 +282,3 @@ class Protocol {
       }
     };
 };
-
-
-
-/*
-  int Protocol::readByte() {
-  int r = io->readBytes(buf, 1);
-  if (r != 1)
-    return -1;
-  return buf[0];
-  }
-
-
-  Status Protocol::handleColumn() {
-  int pixels = readByte();
-
-  if ( (unsigned int)pixels > maxPixels ) {
-    return error("column too long");
-  }
-
-  for (int pixelPos = 0; pixelPos < pixels; pixelPos ++) {
-    int r = io->readBytes(buf, 3);
-    if (r != 3) {
-      debug("incomplete pixel %d: %d", pixelPos, r);
-      return error("incomplete pixel");
-    }
-    callbacks->setPixelColor(pixelPos, buf[0], buf[1], buf[2]);
-  }
-  callbacks->show();
-  return ack();
-  }
-
-
-  void Protocol::checkChannel() {
-  static int last = -2;
-
-  int b = io->read();
-  if (b != last) {
-    debug("COOMMAND '%c' (%d) avail=%d", b, b, io->available());
-    last = b;
-  }
-  switch (b) {
-    case off:
-      handleOff();
-      break;
-    case column:
-      handleColumn();
-      break;
-    case -1:
-      // nothing to read.
-      break;
-    default:
-      (void) error("unexpected message"); // Ignore [[nodiscard]]
-  }
-  }
-*/

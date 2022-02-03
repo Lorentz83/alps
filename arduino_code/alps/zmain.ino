@@ -17,17 +17,14 @@
     along with ALPS.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
-
-LedControl ledControl(NUMPIXELS, LED_STRIP_PIN);
-Protocol<144, 1> protocol(&ledControl, cmdSerial);
+LedControl<NUM_PIXELS> ledControl(LED_STRIP_PIN);
+Protocol<NUM_PIXELS, MAX_COL_TRANSFER> protocol(&ledControl, cmdSerial);
 
 // We want to have integers which can contain the image width (>255 pixels).
 static_assert((sizeof(unsigned int) >= 2), "need at least 16 bit ints");
 
 void setup() {
 
-  // Serial initialization.
 #ifdef DEBUG_SERIAL
   DEBUG_SERIAL.begin(115200);
   DEBUG_SERIAL.println("debug enabled");
@@ -35,18 +32,14 @@ void setup() {
 
 
 #ifdef BT_PULLUP
-  pinMode(15, INPUT_PULLUP);
-  // This is my personal setup, should make it more generic
-  cmdSerial.begin(115200); // 12 sec 144*x44
-#else
-  cmdSerial.begin(1382400); // 8.25 sec
+  pinMode(BT_PULLUP, INPUT_PULLUP);
 #endif
+
+  cmdSerial.begin(BT_SERIAL_SPEED);
 
   ledControl.init();
   ledControl.flashInit();
 }
-
-
 
 void loop() {
   protocol.checkChannel();

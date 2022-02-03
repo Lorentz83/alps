@@ -18,70 +18,98 @@
 */
 
 
-#include <Adafruit_NeoPixel.h>
+#ifdef DMA_LED
+  #include "WS2812Serial.h" 
+#else 
+  #include <Adafruit_NeoPixel.h>
+#endif
 
+template<int maxPixels>
 class LedControl {
-    Adafruit_NeoPixel pixels;
 
-  public:
+#ifdef DMA_LED
+  byte displayMemory[maxPixels*12]; // 12 bytes per LED
+  byte drawingMemory[maxPixels*3];  //  3 bytes per LED
+  WS2812Serial pixels;
 
-    LedControl(uint16_t numPixels, uint16_t pin) : pixels(numPixels, pin, NEO_GRB + NEO_KHZ800) {
+public: 
+  LedControl(uint16_t pin) : pixels(maxPixels, displayMemory, drawingMemory, pin, WS2812_GRB) {
+  }
+  
+  bool busy() {
+    return pixels.busy();
+  }
+
+#else 
+  Adafruit_NeoPixel pixels;
+
+public:
+  LedControl(uint16_t pin) : pixels(maxPixels, pin, NEO_GRB + NEO_KHZ800) {
+  }
+  
+  bool busy() {
+    return !pixels.canShow();
+  }
+
+#endif
+
+  void init() {
+    pixels.begin();
+  }
+
+  void show() {
+    pixels.show();
+  }
+
+  void fill(uint8_t r, uint8_t g, uint8_t b) {
+    for ( int i = 0 ; i < maxPixels ; i++ ) {
+        pixels.setPixelColor(i, r, g, b);
     }
+  }
 
-    void init() {
-      pixels.begin();
-    }
+  void off() {
+    fill(0, 0, 0);
+    pixels.show();
+  }
 
-    void show() {
-      pixels.show();
-    }
+  void setPixelColor(uint16_t pos, uint8_t r, uint8_t g, uint8_t b) {
+    pixels.setPixelColor(pos, r, g, b);
+  }
 
-    void off() {
-      pixels.fill(pixels.Color(0, 0, 0));
-      pixels.show();
-    }
+  void flashError() {
+    fill(100, 0, 0);
+    pixels.show();
+    delay(500);
+    fill(2, 0, 0);
+    pixels.show();
+    delay(500);
+    fill(100, 0, 0);
+    pixels.show();
+    delay(500);
+    fill(2, 0, 0);
+    pixels.show();
+    delay(500);
+    fill(100, 0, 0);
+    pixels.show();
+    delay(500);
+    off();
+  }
 
-    void setPixelColor(uint16_t pos, uint8_t r, uint8_t g, uint8_t b) {
-      pixels.setPixelColor(pos, r, g, b);
-    }
+  void flashInit() {
+    fill(2, 0, 0);
+    pixels.show();
+    delay(200);
+    fill(0, 2, 0);
+    pixels.show();
+    delay(200);
+    fill(0, 0, 2);
+    show();
+    delay(200);
+    off();
+  }
 
-    void flashError() {
-      pixels.fill(pixels.Color(100, 0, 0));
-      pixels.show();
-      delay(500);
-      pixels.fill(pixels.Color(2, 0, 0));
-      pixels.show();
-      delay(500);
-      pixels.fill(pixels.Color(100, 0, 0));
-      pixels.show();
-      delay(500);
-      pixels.fill(pixels.Color(2, 0, 0));
-      pixels.show();
-      delay(500);
-      pixels.fill(pixels.Color(100, 0, 0));
-      pixels.show();
-      delay(500);
-      off();
-    }
+  uint16_t numPixels() const {
+    return maxPixels;
+  }
 
-    void flashInit() {
-      pixels.fill(pixels.Color(2, 0, 0));
-      pixels.show();
-      delay(200);
-      pixels.fill(pixels.Color(0, 2, 0));
-      pixels.show();
-      delay(200);
-      pixels.fill(pixels.Color(0, 0, 2));
-      pixels.show();
-      delay(200);
-      off();
-    }
-
-    uint16_t numPixels() const {
-      return pixels.numPixels();
-    }
-
-    bool busy() {
-      return !pixels.canShow();
-    }
 };

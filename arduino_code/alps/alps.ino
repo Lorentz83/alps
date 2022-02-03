@@ -20,53 +20,75 @@
 // Files are concatenated by filename.
 // This file contains arduino specific configuration and globals.
 
-
-// cmdSerial is the serial line to use to receive commands.
-// dbgSerial is the serial line to send debug messages (can be null).
-// Depending on the arduino model, the type can be either HardwareSerial or Serial_
-
-auto &cmdSerial = Serial3;
+// ============= CONFIGURATION STARTS HERE ===================
 
 // Uncomment to enable debug over Serial
 // #define DEBUG_SERIAL Serial
 
-//Serial_ *cmdSerial = &Serial;
+// cmdSerial is the serial line to use to receive commands.
+auto &cmdSerial = Serial3;
+
+#ifdef ARDUINO_TEENSY40 // Probably Tennsy 3.x and 4.1 works too, I just don't have any to try.
+
+  #define BT_SERIAL_SPEED 1382400 // Faster speed for Teensy.
+  #define MAX_COL_TRANSFER 6      // If more than 1, DMA_LED must be enabled.
+
+#else // fallback to Arduino
+
+  #define BT_SERIAL_SPEED 115200 // Slower speed safe for Arduino.
+  #define MAX_COL_TRANSFER 1     // We need DMA for this.
+
+#endif
 
 
 // Should enable the pullup resistor for the bluetooth device?
 // See https://forum.arduino.cc/index.php?topic=280928.0
 // probably only required for JY-MCU v1.06 board.
-// without this you can transmit but not receive.
-//#define BT_PULLUP
+// If your bluetooth can transmit but not receive try enabling this.
+// It is the pin number of Serial3 RX. If you changed cmdSerial you should update this too.
+// #define BT_PULLUP 15
 
 // Where the led strip is connected.
+// If DMA_LED is used, check the supported pin at https://github.com/PaulStoffregen/WS2812Serial
 const uint16_t LED_STRIP_PIN = 8;
 
 // How long is the led strip.
-const uint16_t NUMPIXELS = 144;
+const uint16_t NUM_PIXELS = 144;
 
+// ============= SAFE DEFAULTS =================
+// This section is still configuration, but it contains safe defaults that can be inferred by the previus config.
+
+#if MAX_COL_TRANSFER > 1
+  
+  // Use the WS2812Serial library for faster operation (only for Teensy).
+  #define DMA_LED
+
+#endif
+
+// ============= CONFIGURATION ENDS HERE ===================
+
+// Debug helper.
 
 #ifdef DEBUG_SERIAL
-#include <stdarg.h>
 
-void debugf(int line, const char* msg, ...) {
-  static const size_t debugBufLen = 40;
-  static char debugbuf[debugBufLen];
-
-  va_list ap;
-  va_start( ap, msg );
-  vsnprintf(debugbuf, debugBufLen, msg, ap);
-  va_end(ap);
-
-  DEBUG_SERIAL.print(line, DEC);
-  DEBUG_SERIAL.write(' ');
-  DEBUG_SERIAL.println(debugbuf);
-}
-
-#define debug(...) debugf(__LINE__, __VA_ARGS__)
+  #include <stdarg.h>
+  void debugf(int line, const char* msg, ...) {
+    static const size_t debugBufLen = 40;
+    static char debugbuf[debugBufLen];
+  
+    va_list ap;
+    va_start( ap, msg );
+    vsnprintf(debugbuf, debugBufLen, msg, ap);
+    va_end(ap);
+  
+    DEBUG_SERIAL.print(line, DEC);
+    DEBUG_SERIAL.write(' ');
+    DEBUG_SERIAL.println(debugbuf);
+  }
+  #define debug(...) debugf(__LINE__, __VA_ARGS__)
 
 #else
 
-#define debug(...)
+  #define debug(...)
 
 #endif
