@@ -37,7 +37,7 @@
     <string name="about">About</string>
     <string name="about_title">ALPS (Another Light Painting Stick)</string>
     <string name="about_text">
-        Copyright © 2020 Lorenzo Bossi
+        Copyright © 2020-2021 Lorenzo Bossi
         \n\n
         This program is free software: you can redistribute it and/or modify
         it under the terms of the GNU General Public License as published by
@@ -52,6 +52,9 @@
         You should have received a copy of the GNU General Public License
         along with this program.  If not, see
         <a href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>.
+        \n\n
+        For more information check the project
+        <a href="https://github.com/Lorentz83/alps">website</a>.
     </string>
     <string name="action_edit_image">Edit...</string>
     <string name="title_activity_edit_image">Edit image</string>

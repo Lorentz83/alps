@@ -1,5 +1,5 @@
 /**
-    Copyright 2020 Lorenzo Bossi
+    Copyright 2020-2021 Lorenzo Bossi
 
     This file is part of ALPS (Another Light Painting Stick).
 
