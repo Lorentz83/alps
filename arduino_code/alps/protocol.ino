@@ -137,7 +137,7 @@ class Protocol {
 
     Status handleInfo() {
       buf[0] = '!';
-      buf[1] = 0; // no exteneions.
+      buf[1] = 0; // no extensions.
       buf[2] = 0; // not used.
       buf[3] = maxPixels;
       buf[4] = maxCols;

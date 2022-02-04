@@ -17,8 +17,6 @@ An unordered list of stuff I'd like to work on:
 
 - documentation:
   - add some example photos;
-- improve the protocol and see if I can make a better use of the
-  Teensy computational power and extra memory;
 - on the board side:
   - re-add/improve SD card support;
 - on the Android side:
@@ -155,3 +153,10 @@ proper device operation"[^2].
 
 [^1]: https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels
 [^2]: https://www.ti.com/lit/ds/symlink/sn74ahct125.pdf
+
+
+## License
+
+This program is free software. The code I wrote is under GPL but some
+of it depends on libraries under different (but compatible) license.
+In doubt check the header of the specific files.
