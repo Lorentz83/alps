@@ -91,6 +91,7 @@ class Protocol {
 
     uint8_t pxPerCol = 0;
     uint8_t delayBetweenCols = 0;
+    unsigned long lastColDrawnTs = 0;
     uint8_t numCols = 0;
     bool lastBatchOfCols = false;
 
@@ -163,6 +164,7 @@ class Protocol {
 
       pxPerCol = buf[0];
       delayBetweenCols = buf[1];
+      lastColDrawnTs = 0;
       numCols = buf[2];
       lastBatchOfCols = false;
 
@@ -180,7 +182,8 @@ class Protocol {
       return handleColumn();
     }
 
-    // handleColumn reads and writes columns, depeding on what's available now.
+    // handleColumn reads column data from the stream and writes them to the stick,
+    // in a non blocking way, depeding on what's possible to do when it runs.
     Status handleColumn() {
       // Do I have data in the stream to read and buffer to put it into?
       if ( numCols > 0 && colBuf.canWrite() ) {
@@ -197,20 +200,26 @@ class Protocol {
       }
 
       // Do I have data in the buffer to show on the stick?
-      if ( !callbacks->busy() && colBuf.canRead() ) { // TODO use delayBetweenCols.
-        byte* buf = colBuf.readNextColumn();
-        for ( int n = 0 ; n < pxPerCol ; n++ ) {
-          byte r = *buf;
-          buf++;
-          byte g = *buf;
-          buf++;
-          byte b = *buf;
-          buf++;
-          callbacks->setPixelColor(n, r, g, b);
+      if ( !callbacks->busy() && colBuf.canRead() ) {
+        if ( millis() > lastColDrawnTs + delayBetweenCols ) { // I honestly hope no one will keep the stick on so long to overflow millis().
+          byte* buf = colBuf.readNextColumn();
+          for ( int n = 0 ; n < pxPerCol ; n++ ) {
+            byte r = *buf;
+            buf++;
+            byte g = *buf;
+            buf++;
+            byte b = *buf;
+            buf++;
+            callbacks->setPixelColor(n, r, g, b);
+          }
+          // We assume that the last image called off correctly, hence the rest of pixels should be already black.
+          
+          callbacks->show();
+          
+          // If we use the neopixel library, delayBetweenCols is *extra* delay between cols, which is easier to reason about.
+          // If we use WS2812Serial, we are capped by the bluetooth speed, so this may smooth out the transition, even if smaller values of delays may be useless.
+          lastColDrawnTs = millis();
         }
-
-        // We assume that the last image called off correctly, hence the rest of pixels should be already black.
-        callbacks->show();
       }
 
       // If nothing left on the wire and all the columns has been sent to the stick.

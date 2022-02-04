@@ -205,6 +205,7 @@ according to a few stores, HC-05 should implement Bluetooth 2.0 + EDR,
 which should offer 2.1 Mbit/s of transfer speed
 ([Wikipedia](https://en.wikipedia.org/wiki/Bluetooth#Bluetooth_2.0_+_EDR)).
 But here we see barely 230Kbit/s.
+Which is 230.000 bauds, much lower than the 1.382.400 the module is set.
 
 Honestly, I feel that the bluetooth protocol is terribly complex and
 I'm not even sure which bluetooth version my laptop supports. I just

@@ -194,9 +194,10 @@ public class Protocol {
      * @param h the height of the image.
      * @param pixels the color of the pixels in ARGB format, ordered in columns.
      * @param brightness between 0 (totally off) and 1 (full brightness).
+     * @param sleep between columns, in ms between 0 and 255.
      * @param callback if non null, this predicate is called with the number of the last column sent.
      * @throws IOException in case of error.
-     * @throws IllegalArgumentException if the number of pixels is not aligned with the image size.
+     * @throws IllegalArgumentException if the number of pixels is not aligned with the image size, or sleep is out of bounds.
      */
     public void showImage(int w, int h, int[] pixels, float brightness, int sleep, IntConsumer callback) throws IOException, InterruptedException {
         if ( h > _maxPixels ) {
@@ -205,13 +206,16 @@ public class Protocol {
         if (pixels.length != w*h) {
             throw new IllegalArgumentException("number of pixels doesn't match the image size");
         }
+        if ( sleep > 255 || sleep < 0 ) {
+            throw new IllegalArgumentException("sleep must be between 0 and 255");
+        }
         int idx = 0;
         int col = Math.min(_maxCols, w);
         PixelColor c = new PixelColor();
 
         _buf[idx++] = NEW_IMAGE;
         _buf[idx++] = (byte) h;
-        _buf[idx++] = (byte) sleep; // TODO define the unit.
+        _buf[idx++] = (byte) sleep;
         _buf[idx++] = (byte) col;
 
         for ( int x = 0 ; x < w ; x++) {
