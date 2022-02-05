@@ -154,10 +154,10 @@ class internalSender extends Thread {
                 Bitmap bmp = waitForBitmap();
                 log.i("got bitmap");
 
-                int delay = 0;
-                boolean loop = false;
-                float brightness = 100;
-                boolean upload = false;
+                int delay;
+                boolean loop;
+                float brightness;
+                boolean upload;
                 synchronized (this) {
                     delay = _delay;
                     loop = _loop;
@@ -183,7 +183,7 @@ class internalSender extends Thread {
             try {
                 _p.off();
             } catch (IOException ex) {
-                log.w("Protocol error while turning off stick", e);
+                log.w("Protocol error while turning off stick", ex);
             }
         } catch (IOException e) {
             _callbacks.onError(e);
@@ -207,11 +207,9 @@ class internalSender extends Thread {
         int []pixels = new int[w*h];
         bmp.getPixels(pixels, 0, bmp.getWidth(), 0, 0, bmp.getWidth(), bmp.getHeight());
 
-        do {
-            _p.showImage(w, h, pixels, brightness, delay, (int col) -> {
-                _callbacks.progress(Math.round((float) col / w * 100));
-            });
-        } while (loop);
+        _p.showImage(w, h, pixels, brightness, delay, loop, (int col) -> {
+            _callbacks.progress(Math.round((float) col / w * 100));
+        });
     }
 
     // To avoid synchronization problems, this function is static and cannot access any field.

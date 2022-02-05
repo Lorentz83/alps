@@ -24,8 +24,6 @@ import android.bluetooth.BluetoothSocket;
 
 import androidx.annotation.NonNull;
 
-import com.github.lorentz83.alps.utils.LogUtility;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,17 +35,15 @@ import java.util.zip.CRC32;
  * Defines the communication protocol with the stick.
  */
 public class Protocol {
-    private final static LogUtility log = new LogUtility(Protocol.class);
-
     private InputStream _in;
     private OutputStream _out;
 
-    private final byte INFO = '?';
-    private final byte OFF = 'o';
-    private final byte NEW_IMAGE = 'n';
-    private final byte CONTINUE_IMAGE = 'c';
+    private static final byte INFO = '?';
+    private static final byte OFF = 'o';
+    private static final byte NEW_IMAGE = 'n';
+    private static final byte CONTINUE_IMAGE = 'c';
 
-    private CRC32 _crc = new CRC32();
+    private final CRC32 _crc = new CRC32();
     private byte[] _buf = new byte[255*3+2];
 
     private int _maxPixels = 144;
@@ -195,11 +191,13 @@ public class Protocol {
      * @param pixels the color of the pixels in ARGB format, ordered in columns.
      * @param brightness between 0 (totally off) and 1 (full brightness).
      * @param sleep between columns, in ms between 0 and 255.
+     * @param loop if the image must be repeated in loop (if true this function never returns, send an interrupt to the thread to block it with an InterruptedException)
      * @param callback if non null, this predicate is called with the number of the last column sent.
      * @throws IOException in case of error.
      * @throws IllegalArgumentException if the number of pixels is not aligned with the image size, or sleep is out of bounds.
+     * @throws InterruptedException if the thread gets interrupted.
      */
-    public void showImage(int w, int h, int[] pixels, float brightness, int sleep, IntConsumer callback) throws IOException, InterruptedException {
+    public void showImage(int w, int h, int[] pixels, float brightness, int sleep, boolean loop, IntConsumer callback) throws IOException, InterruptedException {
         if ( h > _maxPixels ) {
             throw new ProtocolException("the stick has only " + _maxPixels + " pixels");
         }
@@ -209,45 +207,51 @@ public class Protocol {
         if ( sleep > 255 || sleep < 0 ) {
             throw new IllegalArgumentException("sleep must be between 0 and 255");
         }
-        int idx = 0;
-        int col = Math.min(_maxCols, w);
-        PixelColor c = new PixelColor();
 
-        _buf[idx++] = NEW_IMAGE;
-        _buf[idx++] = (byte) h;
-        _buf[idx++] = (byte) sleep;
-        _buf[idx++] = (byte) col;
+        do {
 
-        for ( int x = 0 ; x < w ; x++) {
-            for ( int y = 0 ; y < h ; y++) {
-                c.setColor(pixels[x*h+y], brightness);
-                _buf[idx++] = c.getRed();
-                _buf[idx++] = c.getGreen();
-                _buf[idx++] = c.getBlue();
+            int idx = 0;
+            int col = Math.min(_maxCols, w);
+            PixelColor c = new PixelColor();
+
+            _buf[idx++] = NEW_IMAGE;
+            _buf[idx++] = (byte) h;
+            _buf[idx++] = (byte) sleep;
+            _buf[idx++] = (byte) col;
+
+            for (int x = 0; x < w; x++) {
+                for (int y = 0; y < h; y++) {
+                    c.setColor(pixels[x * h + y], brightness);
+                    _buf[idx++] = c.getRed();
+                    _buf[idx++] = c.getGreen();
+                    _buf[idx++] = c.getBlue();
+                }
+                if (--col == 0) {
+                    // Send the data.
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException();
+                    }
+                    sendAndWaitForAck(_buf, idx);
+                    // Reset counters.
+                    idx = 0;
+                    int colsRemaining = w - x - 1; // We just sent the col "x".
+                    col = Math.min(_maxCols, colsRemaining);
+                    // Prepare new message.
+                    // NOTE: it may be useless because we just sent the last col.
+                    // But in case we sent everything with the 1st message we still need to send the
+                    // terminator.
+                    _buf[idx++] = CONTINUE_IMAGE;
+                    _buf[idx++] = (byte) ((col == colsRemaining && ! loop) ? 1 : 0); // lastBatchOfCols
+                    _buf[idx++] = (byte) col; // Num cols to send.
+                }
+                if (callback != null) {
+                    callback.accept(x + 1);
+                }
             }
-            if ( --col == 0 ) {
-                // Send the data.
-                Thread.sleep(0); // To support InterruptedException. No need to reset here, the caller does it.
+            if (w <= _maxCols) {
                 sendAndWaitForAck(_buf, idx);
-                // Reset counters.
-                idx = 0;
-                int colsRemaining = w - x - 1; // We just sent the col "x".
-                col = Math.min(_maxCols, colsRemaining);
-                // Prepare new message.
-                // NOTE: it may be useless because we just sent the last col.
-                // But in case we sent everything with the 1st message we still need to send the
-                // terminator.
-                _buf[idx++] = CONTINUE_IMAGE;
-                _buf[idx++] = (byte) ((col == colsRemaining) ? 1 : 0); // lastBatchOfCols
-                _buf[idx++] = (byte) col; // Num cols to send.
             }
-            if (callback != null) {
-                callback.accept(x+1);
-            }
-        }
-        if (w <= _maxCols) {
-            sendAndWaitForAck(_buf, idx);
-        }
+        } while (loop);
     }
 
     /**
