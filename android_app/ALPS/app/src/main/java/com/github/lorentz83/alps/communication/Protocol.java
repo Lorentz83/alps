@@ -207,12 +207,14 @@ public class Protocol {
         if ( sleep > 255 || sleep < 0 ) {
             throw new IllegalArgumentException("sleep must be between 0 and 255");
         }
+        if ( brightness > 1 || brightness < 0 ) {
+            throw new IllegalArgumentException("brightness must be between 0 and 1");
+        }
 
         do {
 
             int idx = 0;
             int col = Math.min(_maxCols, w);
-            PixelColor c = new PixelColor();
 
             _buf[idx++] = NEW_IMAGE;
             _buf[idx++] = (byte) h;
@@ -221,10 +223,16 @@ public class Protocol {
 
             for (int x = 0; x < w; x++) {
                 for (int y = 0; y < h; y++) {
-                    c.setColor(pixels[x * h + y], brightness);
-                    _buf[idx++] = c.getRed();
-                    _buf[idx++] = c.getGreen();
-                    _buf[idx++] = c.getBlue();
+                    int argb = pixels[x * h + y];
+
+                    int alpha = argb >>> 24;
+                    int red = (argb >> 16) & 0xFF;
+                    int green = (argb >> 8) & 0xFF;
+                    int blue = argb & 0xFF;
+
+                    _buf[idx++] = (byte) Math.round((brightness * alpha) / 255.0 * red);
+                    _buf[idx++] = (byte) Math.round((brightness * alpha) / 255.0 * green);
+                    _buf[idx++] = (byte) Math.round((brightness * alpha) / 255.0 * blue);
                 }
                 if (--col == 0) {
                     // Send the data.
