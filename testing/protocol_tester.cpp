@@ -42,6 +42,12 @@ enum PrintFormat { BIN, OCT, DEC, HEX };
 
 void delay(int) {}
 
+long int millis() {
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+      .count();
+}
+
 class NonBlockingInput {
   std::istream *in;
   std::thread t;
@@ -204,7 +210,7 @@ struct SDType {
   File open(const char *name, int mode = O_READ) { return File{}; }
 } SD;
 
-struct LedControl {
+template <int maxPixels> struct LedControl {
 
   void init() {}
 
@@ -238,7 +244,7 @@ struct LedControl {
 
   void flashInit() {}
 
-  uint16_t numPixels() const { return 144; }
+  uint16_t numPixels() const { return maxPixels; }
 
   bool busy() { return false; }
 };
@@ -277,7 +283,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  LedControl lc;
+  LedControl<144> lc;
   Stream io(&std::cin, &std::cout);
 
   Protocol<144, TESTING_COLS> protocol(&lc, io);

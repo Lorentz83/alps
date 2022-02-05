@@ -57,7 +57,7 @@ class Protocol_IntegrationTest {
                 color = color >>> 8;
             }
 
-            p.showImage(w, h, pixels, .5F, 0, null);
+            p.showImage(w, h, pixels, .5F, 0,false, null);
 
             byte s = (byte) 0x80; // scaled by brightness.
             byte []want = new byte[]{
@@ -92,7 +92,7 @@ class Protocol_IntegrationTest {
                 pixels[i] = (int)(Math.random()*0XFFFFFF) | 0XFF000000; // Random color fully opaque.
             }
 
-            p.showImage(w, h, pixels, .5F, 0, null);
+            p.showImage(w, h, pixels, .5F, 0, false, null);
             p.off(); // Let's be sure we are still in sync.
         }
     }
