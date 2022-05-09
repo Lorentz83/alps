@@ -125,6 +125,14 @@ public class SettingsFragment extends Fragment {
         });
         width.setProgress(Math.round(_sharedPref.getWidthMultiplier() * 100));
 
+        Switch useBilinear = root.findViewById(R.id.bilinear_filter_switch);
+        useBilinear.setChecked(_sharedPref.getUseBilinearFilter());
+        useBilinear.setOnCheckedChangeListener((buttonView, isChecked) -> _sharedPref.setUseBilinearFilter(isChecked));
+
+        Switch antialiasing = root.findViewById(R.id.anti_alias_switch);
+        antialiasing.setChecked(_sharedPref.getAntiAliasing());
+        antialiasing.setOnCheckedChangeListener((buttonView, isChecked) -> _sharedPref.setAntiAliasing(isChecked));
+
         return root;
     }
 }

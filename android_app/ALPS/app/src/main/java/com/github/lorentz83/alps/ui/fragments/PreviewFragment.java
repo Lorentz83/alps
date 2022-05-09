@@ -20,15 +20,15 @@
 
 package com.github.lorentz83.alps.ui.fragments;
 
-import android.app.Activity;
 import android.bluetooth.BluetoothSocket;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,7 +38,6 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
@@ -190,6 +189,24 @@ public class PreviewFragment extends Fragment {
         updatePreview();
     }
 
+    private @NonNull Bitmap blur(@NonNull Bitmap image, float radius) {
+        Bitmap outputBitmap = image.copy(image.getConfig(), image.isMutable());
+        if ( radius == 0 ) {
+            return outputBitmap;
+        }
+
+        final RenderScript renderScript = RenderScript.create(getContext());
+        Allocation tmpIn = Allocation.createFromBitmap(renderScript, image);
+        Allocation tmpOut = Allocation.createFromBitmap(renderScript, outputBitmap);
+
+        ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript));
+        theIntrinsic.setRadius(radius);
+        theIntrinsic.setInput(tmpIn);
+        theIntrinsic.forEach(tmpOut);
+        tmpOut.copyTo(outputBitmap);
+        return outputBitmap;
+    }
+
     /**
      * Updates the image preview.
      * <p>
@@ -210,11 +227,19 @@ public class PreviewFragment extends Fragment {
         w = (int) Math.round((double) len / h * w * widthMultiplier);
         h = len;
 
-        // bilinear scaling down, nearest neighbor scaling up.
-        // TODO this should probably be an option.
-        boolean useBilinear = _fullSizeBitmap.getHeight() > h;
+        boolean useBilinear = _sharedPref.getUseBilinearFilter();
+        boolean antiAliasing = _sharedPref.getAntiAliasing();
+        float blurRadius = 0f;
+        if ( antiAliasing ) {
+            float blurRadiusH = _fullSizeBitmap.getHeight() / (float)h;
+            float blurRadiusW = _fullSizeBitmap.getWidth() / (float)w;
+            blurRadius = (blurRadiusH + blurRadiusW) / 2;
+        }
 
-        _bitmap = Bitmap.createScaledBitmap(_fullSizeBitmap, w, h, useBilinear);
+        log.i("use bilinear = %s, blur = %s, blur radius %f", useBilinear, antiAliasing, blurRadius);
+
+        _bitmap = blur(_fullSizeBitmap, blurRadius);
+        _bitmap = Bitmap.createScaledBitmap(_bitmap, w, h, useBilinear);
 
         BitmapDrawable myBitmapDrawable = new BitmapDrawable(getResources(), _bitmap);
         myBitmapDrawable.getPaint().setFilterBitmap(false);

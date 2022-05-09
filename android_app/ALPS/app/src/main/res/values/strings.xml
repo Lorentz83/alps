@@ -58,4 +58,6 @@
     </string>
     <string name="action_edit_image">Edit...</string>
     <string name="title_activity_edit_image">Edit image</string>
+    <string name="anti_aliasing">Anti aliasing</string>
+    <string name="use_bilinear_filter">Use bilinear filter</string>
 </resources>

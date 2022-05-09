@@ -126,7 +126,7 @@ public class MyPagerAdapter extends FragmentPagerAdapter {
             @Override
             public void onPageSelected(int position) {
                 if (_fragments[position].fragment == _previewFragment) {
-                    // TODO: ti would be nice to decouple better this.
+                    // TODO: it would be nice to decouple better this.
                     _previewFragment.updatePreview();
                 }
             }

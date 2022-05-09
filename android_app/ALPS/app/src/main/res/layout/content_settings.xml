@@ -107,5 +107,16 @@
             android:layout_weight="1" />
     </LinearLayout>
 
+    <Switch
+        android:id="@+id/anti_alias_switch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/anti_aliasing" />
+
+    <Switch
+        android:id="@+id/bilinear_filter_switch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/use_bilinear_filter" />
 
 </LinearLayout>

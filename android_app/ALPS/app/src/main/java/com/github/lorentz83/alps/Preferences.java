@@ -33,6 +33,8 @@ public class Preferences {
     private static final String WAIT_TIME_MS = "wait_time_ms";
     private static final String STICK_BRIGHTNESS = "stick_brightness";
     private static final String WIDTH_MULTIPLIER = "width_multiplier";
+    private static final String USE_BILINEAR_FILTER = "use_bilinear_filter";
+    private static final String ANTI_ALIASING = "anti_aliasing";
 
     private final SharedPreferences _sharedPref;
     private static Preferences _instance;
@@ -121,4 +123,23 @@ public class Preferences {
         return _dev;
     }
 
+    public boolean getUseBilinearFilter(){
+         return _sharedPref.getBoolean(USE_BILINEAR_FILTER, true);
+    }
+
+    public void setUseBilinearFilter(boolean checked){
+        SharedPreferences.Editor editor = _sharedPref.edit();
+        editor.putBoolean(USE_BILINEAR_FILTER, checked);
+        editor.apply();
+    }
+
+    public boolean getAntiAliasing(){
+        return _sharedPref.getBoolean(ANTI_ALIASING, true);
+    }
+
+    public void setAntiAliasing(boolean val){
+        SharedPreferences.Editor editor = _sharedPref.edit();
+        editor.putBoolean(ANTI_ALIASING, val);
+        editor.apply();
+    }
 }
